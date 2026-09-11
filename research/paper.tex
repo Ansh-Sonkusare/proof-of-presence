@@ -31,7 +31,7 @@
 
 \lstdefinestyle{solidity}{%
   language=Solidity,
-  basicstyle=\fontsize{7.6}{9.1}\selectfont\ttfamily,
+  basicstyle=\fontsize{6.8}{8.2}\selectfont\ttfamily,
   keywordstyle=\bfseries\color{blue!55!black},
   commentstyle=\itshape\color{green!40!black},
   stringstyle=\color{orange!70!black},
@@ -47,8 +47,8 @@
   keepspaces=true,
   showstringspaces=false,
   tabsize=2,
-  aboveskip=5pt,
-  belowskip=3pt,
+  aboveskip=4pt,
+  belowskip=2pt,
   xleftmargin=3pt,
   xrightmargin=2pt
 }
@@ -240,18 +240,19 @@ holds QR-nonce expirations and cached forwarder nonces.
 \node[tier] (b) at (4.0,0) {\textbf{2. Backend API}\\[2pt] Effect-TS HttpApi\\ QR HMAC issuance\\ nonce + spatial checks\\ signature verification};
 \node[tier] (r) at (8.0,0) {\textbf{3. Relayer}\\[2pt] ethers v6, deployer key\\ Redis nonce cache\\ pays gas};
 \node[tier] (ch) at (12.0,0) {\textbf{4. Chain}\\[2pt] ERC2771Forwarder\\ AttendanceRegistry\\ \_msgSender\\ eligibility};
-\node[aux] (db) at (4.0,-2.6) {\textbf{PostgreSQL / Redis}\\[2pt] Prisma records\\ rejection log\\ nonce expirations};
+\node[aux] (db) at (4.0,-2.4) {\textbf{PostgreSQL / Redis}\\[2pt] Prisma records\\ rejection log\\ nonce expirations};
 \draw[arr] (c) -- node[above,font=\scriptsize] {QR + EIP-712 $\sigma$} (b);
-\draw[arr] (b) -- node[above,font=\scriptsize] {verified request} (r);
+\draw[arr] (b) -- node[above,font=\scriptsize] {verified req} (r);
 \draw[arr] (r) -- node[above,font=\scriptsize] {execute(), gas} (ch);
-\draw[arr, dashed] (ch) -- node[above,font=\scriptsize] {events, reads} (b);
-\draw[arr, dashed] (b) -- (db);
+\draw[arr, dashed] (ch.south) to[out=210,in=330] node[below,font=\scriptsize,yshift=-2pt] {events, reads} (b.south);
+\draw[arr, dashed] (b.south) -- (db.north);
 \end{tikzpicture}}
 \caption{Four-tier architecture. Arrows show the check-in data flow; dashed
 arrows show reads and event synchronization.}
 \label{fig:arch}
 \end{figure*}
 
+\vspace{6pt}
 \subsection{Enrollment}
 At enrollment the app generates a P-256 key pair inside the device's secure
 hardware, requests a platform attestation (Section~\ref{sec:hardware}), and
