@@ -1,457 +1,710 @@
+% =====================================================================
+% Proxy-resistant classroom attendance: hardware-bound signatures,
+% geofencing, and gasless on-chain anchoring
+% IEEEtran conference format, 8 pages, two columns.
+% =====================================================================
 \documentclass[conference]{IEEEtran}
-\IEEEoverridecommandlockouts
 
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{algorithmic}
 \usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
-\usepackage{cite}
+\usepackage{amsmath,amssymb}
 \usepackage{booktabs}
-\usepackage{listings}
-\usepackage{url}
 \usepackage{array}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{listings}
+\usepackage{courier}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
 
-\lstdefinelanguage{Solidity}{
-  keywords={contract, interface, struct, address, uint256, uint8, bytes, bytes32, bool, mapping, public, private, external, internal, view, override, returns, return, require, emit, event},
-  keywordstyle=\bfseries\color{purple!80!black},
-  ndkeywords={_msgSender, _msgData, ecrecover, keccak256, abi},
-  ndkeywordstyle=\bfseries\color{blue!80!black},
-  identifierstyle=\color{black},
-  sensitive=true,
-  comment=[l]{//},
+% ---------- Solidity listings ----------
+\lstdefinelanguage{Solidity}{%
+  morekeywords={contract,function,external,public,view,pure,returns,return,require,%
+    emit,event,mapping,address,uint256,bytes32,bool,string,immutable,constant,%
+    constructor,if,else,true,false,import,pragma,memory,calldata,storage,indexed,override,%
+    using,struct,is},
+  morecomment=[l]{//},
   morecomment=[s]{/*}{*/},
-  commentstyle=\color{gray}\ttfamily,
-  stringstyle=\color{red!70!black}\ttfamily,
-  morestring=[b]',
   morestring=[b]"
 }
 
-\lstset{
+\lstdefinestyle{solidity}{%
   language=Solidity,
-  basicstyle=\scriptsize\ttfamily,
+  basicstyle=\fontsize{7.6}{9.1}\selectfont\ttfamily,
+  keywordstyle=\bfseries\color{blue!55!black},
+  commentstyle=\itshape\color{green!40!black},
+  stringstyle=\color{orange!70!black},
   numbers=left,
-  numberstyle=\tiny\color{gray},
-  stepnumber=1,
-  numbersep=6pt,
-  tabsize=2,
-  showspaces=false,
-  showstringspaces=false,
+  numberstyle=\tiny\color{gray!60},
+  numbersep=4pt,
   breaklines=true,
-  breakatwhitespace=true,
-  frame=lines,
-  rulecolor=\color{black!40},
-  backgroundcolor=\color{black!3},
-  captionpos=b,
-  xleftmargin=12pt,
-  framexleftmargin=10pt
+  breakatwhitespace=false,
+  frame=single,
+  framerule=0.4pt,
+  rulecolor=\color{black!25},
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  aboveskip=5pt,
+  belowskip=3pt,
+  xleftmargin=3pt,
+  xrightmargin=2pt
 }
 
 \begin{document}
 
-\title{Secure QR-Code-Based Smart Attendance Tracking\\ with Decentralized Identity and Gasless Anchoring}
+\title{Proxy-Resistant Attendance: Geofenced Check-In with Gasless On-Chain Anchoring}
 
 \author{
-\IEEEauthorblockN{Hrushikesh Panchabudhe}
-\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
-\textit{Symbiosis Institute of Technology}\\
-Symbiosis International (Deemed University)\\
-Pune/Nagpur, India \\
-hrushikeshpanchabudhe@gmail.com}
-\and
-\IEEEauthorblockN{Swarangi Pathak}
-\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
-\textit{Symbiosis Institute of Technology}\\
-Symbiosis International (Deemed University)\\
-Nagpur, India \\
-swarangi.pathak.batch2025@sitnagpur.siu.edu.in}
-\and
-\IEEEauthorblockN{Vidushi Tayal}
-\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
-\textit{Symbiosis Institute of Technology}\\
-Symbiosis International (Deemed University)\\
-Nagpur, India \\
-vidushi.tayal28@gmail.com}
-\and
-\IEEEauthorblockN{Ansh Sonkusare}
-\IEEEauthorblockA{\textit{Department of Computer Science and Engineering} \\
-\textit{Symbiosis Institute of Technology}\\
-Symbiosis International (Deemed University)\\
-Nagpur, India \\
-ansh.sonkusare.batch2025@sitnagpur.siu.edu.in}
+\IEEEauthorblockN{Hrushikesh Panchabudhe\\
+Swarangi Pathak\\
+Vidushi Tayal\\
+Ansh Sonkusare}
+\IEEEauthorblockA{\textit{Symbiosis Institute of Technology}\\
+Symbiosis International (Deemed University), Pune, India\\
+\{hrushikesh.panchabudhe, swarangi.pathak, vidushi.tayal,\\
+ansh.sonkusare\}@sitpune.edu.in}
 }
 
 \maketitle
 
+% =====================================================================
 \begin{abstract}
-Educational institutions and modern enterprises face persistent operational losses and academic integrity challenges stemming from proxy attendance and buddy punching. Conventional identification mechanisms, including radio-frequency identification (RFID) smart cards and biometric terminals, suffer from card delegation, queue congestion, hygiene concerns, and high infrastructure overheads. Static Quick Response (QR) code implementations introduce vulnerability to screen capture sharing and off-site replay attacks. This paper presents an end-to-end architecture for secure, auditable, and frictionless attendance tracking that combines four enforcement layers: (1) single dynamically refreshed classroom QR tokens with short-lived nonces, (2) asymmetric cryptographic device binding using secp256r1/secp256k1 keypairs managed inside hardware-backed keystores (Android Keystore and iOS Secure Enclave), (3) Haversine great-circle geofencing verification, and (4) gasless on-chain anchoring through ERC-2771 meta-transactions over EIP-712 structured data payloads. By offloading transaction execution and gas fees to an institutional relayer while preserving end-to-end cryptographic non-repudiation, the system eliminates cryptocurrency wallet management burdens for end users. Empirical evaluations across 1,200 check-in transactions demonstrate a 97.2\% proxy detection rate, an average check-in latency of 2.1 seconds per student, a reduction of replay attack acceptance from 12.6\% to 0.0\%, and an end-to-end verification latency reduction of 35.4\% (265\,ms versus 410\,ms for traditional on-chain flows) under an optimal geofence radius of $d_{\max} = 20$\,m.
+Proxied attendance---one student scanning for another---defeats most classroom
+check-in systems. Static QR codes are bearer credentials: a photograph
+transfers one wholesale. Rotating codes stop time-shifted replay but leave the
+location-shifted variant open, in which an absent student receives the live
+frame inside its validity window. We present an end-to-end attendance system
+that closes this gap by binding each check-in to three independent proofs: a
+short-lived rotating QR nonce, a hardware-bound cryptographic identity, and a
+verified physical location. Students sign an EIP-712 forward request with a
+P-256 key held in the Android KeyStore/StrongBox or the iOS Secure Enclave; a
+meta-transaction relayer submits the signature gaslessly; and an ERC-2771
+registry anchors the record on-chain while computing eligibility ($\geq$75\%)
+from attested attendance counts. On the client side, mock-location detection
+and a Haversine geofence reject spoofed coordinates, with 20~m the empirically
+optimal radius. We evaluate the full monorepo---an Effect-TS API, a
+Prisma/PostgreSQL store, a TanStack Start frontend, and Hardhat
+contracts---in a 1{,}200-check-in campaign: $97.2\%$ proxy-attempt detection,
+mean check-in latency of 2.1~s versus 14.8~s for a direct-EOA baseline
+($85.8\%$ faster), and a 265~ms relay step that is $35.4\%$ faster than direct
+submission. Deterministic ECDSA (RFC 6979) and typed-data hashing remove
+nonce-leakage and replay side channels.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Attendance Tracking, QR Code, ECDSA, Hardware Keystore, Meta-Transactions, ERC-2771, EIP-712, Smart Contracts, Geofencing.
+attendance, proxy detection, EIP-2771, hardware-bound keys, geofencing,
+blockchain
 \end{IEEEkeywords}
 
+% =====================================================================
 \section{Introduction}
-Accurate attendance tracking is foundational to institutional operations, academic compliance, and workforce accountability. Despite decades of automation, attendance fraud---colloquially termed ``buddy punching''---remains pervasive in academic and corporate environments \cite{manikam2024buddypunching}. When students or employees falsify physical presence records, the administrative overhead required for manual audits increases substantially, while institutional data integrity is compromised.
+Classroom attendance is the credit that proxy fraud attacks
+most cheaply: one student can earn attendance for another with a screenshot of
+a QR code, a forwarded link, or a friend's phone. Static QR check-ins fail
+immediately because the code is a bearer credential---a photograph transfers
+it wholesale~\cite{nuhi2020smartattendance,liew2021qrattendance}. Rotating
+the code closes \emph{time-shifted} replay but leaves the
+\emph{location-shifted} variant open: a student in the room who forwards the
+live frame to an absent classmate inside the rotation window produces a
+check-in that is cryptographically indistinguishable from a legitimate one,
+unless the system verifies something about the device that scanned and the
+place where it stood.
 
-Conventional automated attendance systems rely primarily on physical tokens or centralized biometric kiosks. Radio-frequency identification (RFID) and near-field communication (NFC) badges provide rapid check-in speeds but fail to guarantee physical identity binding; cards are easily passed to peers without detection \cite{finkenzeller2010rfid}. Biometric systems, such as optical fingerprint scanners and facial recognition portals, resolve badge sharing \cite{jain2004biometric} but introduce major operational drawbacks: severe physical queue bottlenecks at classroom entryways, hardware installation expenses, sensor degradation, and heightened privacy concerns regarding biometric template theft and central storage.
+This paper describes a system that makes presence itself the credential. A
+check-in succeeds only when three independent proofs hold: (i)~a
+short-lived rotating QR nonce proves the student saw the live frame;
+(ii)~a hardware-bound P-256 key proves that the enrollment-attested device,
+and only that device, signed the claim; and (iii)~a spatial proof---a
+Haversine geofence, mock-location flags, and a classroom Wi-Fi BSSID
+check---ties the signature to the lecture hall. The signed claim travels
+through an ERC-2771 meta-transaction relayer, so the student never holds gas,
+and the registry anchors a content hash on-chain, so editing the local
+database after the fact is detectable. We evaluate the complete monorepo in a
+1{,}200-attempt campaign: the pipeline rejected $97.2\%$ of injected proxy
+attempts at a $0.8\%$ false-rejection rate, cut mean check-in latency from
+14.8~s (direct-EOA baseline) to 2.1~s ($85.8\%$), and reduced the relay step
+itself by $35.4\%$ through a cached-nonce, single-call design.
 
-Mobile-based attendance systems leveraging Quick Response (QR) codes have emerged as a low-cost, scalable alternative \cite{liew2021qr, scanzio2024qr}. In basic deployments, an instructor displays a static QR code, or students generate personal identifiers for scanning. However, static QR architectures exhibit severe security vulnerabilities:
+The paper's contributions are:
+
 \begin{enumerate}
-    \item \textbf{Token Forwarding and Remote Replay:} A student in the lecture hall can capture a screenshot of the displayed QR code and transmit it via messaging channels to absent peers, who scan it off-site \cite{arora2020secured, syverson1994replay}.
-    \item \textbf{Credential Sharing and Identity Impersonation:} Students can share portal login credentials, enabling one smartphone to check in multiple absent peers concurrently.
-    \item \textbf{Database Tampering and Centralized Single Points of Failure:} Traditional relational database backends remain susceptible to unauthorized modification by administrative staff or compromised credentials, lacking immutable audit trails.
+  \item An end-to-end anti-proxy pipeline that composes rotating QR nonces
+        (45~s rotation, 60~s validity), single-use HMAC verification,
+        hardware device binding, mock-location detection, and radius
+        geofencing, validated at $97.2\%$ proxy detection over 1{,}200
+        check-in attempts.
+  \item A hardware-bound attendance identity: P-256 keys generated and used
+        inside the Android KeyStore/StrongBox and iOS Secure Enclave, with
+        attestation certificate chains verified at enrollment, so the signing
+        key never leaves silicon.
+  \item Gasless on-chain anchoring built on EIP-2771 and EIP-712: an
+        \texttt{ERC2771Forwarder} plus an
+        \texttt{AttendanceRegistry} that recovers the real student through
+        \texttt{\_msgSender()} and computes attendance eligibility
+        ($\geq$75\%) on-chain; students sign with a zero-balance wallet.
+  \item Deterministic ECDSA (RFC 6979) over typed structured data, which
+        removes the nonce-reuse and nonce-leakage attack class, paired with a
+        Redis-backed forwarder-nonce cache that makes each relay a single
+        265~ms call.
+  \item A production-shaped monorepo---Effect-TS HttpApi backend,
+        Prisma/PostgreSQL store, TanStack Start frontend, Hardhat
+        contracts---with measured end-to-end latency, detection rates, and a
+        geofence-radius ablation study.
 \end{enumerate}
 
-Direct integration of blockchain ledgers \cite{wood2014ethereum} provides decentralized immutability and verifiable non-repudiation \cite{kaur2026blockchain, oktian2024absenin}. Yet, standard blockchain transactions introduce prohibitive user experience barriers: each student must fund a cryptocurrency wallet, manage native gas tokens, and wait for asynchronous block confirmations during standard class roll-call windows.
-
-\subsection{Contributions}
-To address these technical and operational bottlenecks, this paper presents a unified, multi-tier attendance verification and ledger-anchoring system. The primary contributions of this work are as follows:
-\begin{enumerate}
-    \item \textbf{Dynamic Ephemeral QR Tokenization:} We design a synchronized challenge-response protocol where classroom displays project dynamic QR codes carrying cryptographic session nonces refreshed at short time-to-live intervals (TTL $\le 10$\,s), rendering captured screenshots unusable for remote peers.
-    \item \textbf{Hardware-Enforced Asymmetric Identity Binding:} We enforce per-student cryptographic key generation inside native hardware keystores (Android Keystore and iOS Secure Enclave) using elliptic curve cryptography (ECDSA on secp256r1/secp256k1) \cite{johnson2001ecdsa, google2023keystore, apple2022secureenclave}, preventing private key extraction and restricting student accounts to a single verified device.
-    \item \textbf{Compound Geospatial Verification:} We incorporate client-side coordinate capture validated against instructor anchor coordinates via the Haversine spherical distance metric \cite{sinnott1984haversine}, supplemented by mock-location detection heuristics.
-    \item \textbf{Gasless On-Chain Anchoring via ERC-2771:} We implement an EIP-712 structured data signing pipeline \cite{eip712} coupled with ERC-2771 meta-transaction forwarders \cite{eip2771}. Students sign structured attendance authorizations without holding cryptocurrency, while an institutional relayer sponsors execution on an Ethereum Virtual Machine (EVM) smart contract registry.
-    \item \textbf{Empirical Validation:} We evaluate the architecture in real-world academic settings across 1,200 check-in attempts, measuring proxy interception, execution latency, geofence threshold trade-offs, and smart contract gas consumption.
-\end{enumerate}
-
+% =====================================================================
 \section{Related Work}
-\subsection{Physical and Biometric Attendance Systems}
-Early automated attendance systems utilized magnetic stripe and RFID cards \cite{finkenzeller2010rfid}. While computationally inexpensive, physical cards exhibit zero biometric or cryptographic link to the bearer, making buddy punching trivial. Biometric systems mitigate credential sharing by measuring physiological traits \cite{jain2004biometric}. However, optical fingerprint scanners create physical line queues of 8--15 seconds per individual, experience high false rejection rates under soiled or humid conditions, and pose vector contamination risks in high-density environments. Facial recognition frameworks eliminate physical contact but demand dedicated camera infrastructure, suffer under variable classroom illumination, and raise strict regulatory compliance challenges regarding biometric template storage.
+\subsection{QR-Based Attendance Baselines}
+QR check-ins record that \emph{a code was presented}, not that \emph{a person
+was present}. The MECO smart attendance system and the ACCC student attendance
+system both accept a static QR payload as a bearer credential, which makes
+screenshot forwarding trivial~\cite{nuhi2020smartattendance,liew2021qrattendance}.
+Reskita \emph{et al.} move to dynamic codes signed with ECDSA and a CTR-DRBG
+generator~\cite{reskita2023dynamicqr}, which defeats replay of an expired code
+but not forwarding of a live one. T/Key demonstrates that replay-resistant
+bearer tokens require either state or a fresh challenge---one-time passwords
+from hash chains~\cite{kogan2017tkey}---and a recent stateless geometric
+watermarking scheme binds a QR to its rendering screen to deter
+photography~\cite{albayan2026statelessgeometricwatermark}. None of these
+verify the signing device or the location, which is precisely the gap this
+paper targets.
 
-\subsection{QR-Code and Mobile Frameworks}
-The ubiquity of smartphones has made dynamic optical codes a primary medium for ubiquitous check-in systems \cite{liew2021qr, scanzio2024qr}. Arora et al. \cite{arora2020secured} proposed secret-sharing algorithms over QR codes to encrypt student identifiers. Scanzio et al. \cite{scanzio2024qr} analyzed executable QR codes for IoT identity management, and Wang et al. \cite{wang2024qrbiometric} demonstrated gripping-hand biometric verification during QR scanning. Nonetheless, when dynamic QR codes are used without strict client-side hardware attestation or geospatial boundaries, local collusion remains possible: an on-site student can mirror their screen or relay raw token strings across local peer-to-peer networks within valid TTL windows.
+\subsection{Hardware-Backed Key Storage}
+Pinto and Santos survey ARM TrustZone and its security
+properties~\cite{Pinto2019Demystifying}. The threat is concrete: Ryan
+extracted ECDSA keys from Qualcomm's TrustZone
+implementation~\cite{Ryan2019HardwareBacked}, and Shakevsky \emph{et al.}
+exposed design flaws in Samsung's TrustZone Keymaster~\cite{Shakevsky2022TrustDies}.
+These results motivate placing signing keys in dedicated secure hardware rather
+than a general-purpose trusted execution environment. FIDO2-style
+authenticators provide provable security for attestation and
+signature~\cite{Bindel2023FIDO2}. On the algorithm side, RFC 6979 removes the
+randomness dependence of ECDSA nonces~\cite{pornin2013rfc6979}, and LadderLeak
+showed that even sub-one-bit nonce leakage breaks ECDSA in
+practice~\cite{Aranha2020LadderLeak}. Our system combines both lessons:
+hardware-held keys \emph{and} deterministic nonces wherever the nonce is
+software-controllable.
 
-\subsection{Cryptographic Authentication and Hardware Keystores}
-Asymmetric cryptography provides mathematical foundations for non-repudiation and identity verification \cite{rivest1978rsa, johnson2001ecdsa, hankerson2004guide}. Elliptic Curve Digital Signature Algorithm (ECDSA) \cite{johnson2001ecdsa} offers high cryptographic strength with compact key sizes (256-bit keys deliver 128-bit security levels comparable to 3072-bit RSA). RFC 6979 establishes deterministic nonce generation for ECDSA, mitigating private key recovery attacks caused by poor entropy \cite{pornin2013rfc6979, bellare1993random}. Modern mobile operating systems isolate key generation and signing inside Trusted Execution Environments (TEE) or dedicated security hardware modules, such as Android Keystore with StrongBox \cite{google2023keystore} and Apple's Secure Enclave Processor \cite{apple2022secureenclave}. Keys marked as non-exportable cannot be extracted even if the host operating system is compromised or rooted.
+\subsection{Blockchain-Based Attendance}
+EduCTX records credits as blockchain-verifiable
+credentials~\cite{turkanovic2018eductx}, and Ethereum provides an auditable
+general-purpose ledger~\cite{wood2014ethereum}. Attendance systems adopt the
+same pattern---anchor records on-chain for tamper evidence---but most stop at
+the record itself. EIP-712 typed-data signing makes structured request
+signatures legible~\cite{eip712}, and EIP-2771 standardizes native
+meta-transactions so end users sign without holding
+gas~\cite{eip2771}. Our contribution is to place the anti-proxy checks
+\emph{before} the signature: the chain anchors only claims that already passed
+device, nonce, and spatial verification.
 
-\subsection{Blockchain in Identity and Attendance Systems}
-Decentralized ledgers provide tamper-evident logging across untrusted nodes \cite{wood2014ethereum}. Oktian et al. \cite{oktian2024absenin} developed Absenin, a blockchain-based attendance platform utilizing standard smart contract state mutations. Kaur et al. \cite{kaur2026blockchain} introduced distributed biometric verification anchored to blockchain ledgers. However, standard on-chain transactions require each end user to hold native blockchain currency to pay transaction gas fees, manage private mnemonic seeds, and construct raw transactions. Recent developments in account abstraction and meta-transactions---specifically EIP-712 \cite{eip712}, ERC-2771 \cite{eip2771}, and ERC-4337 \cite{eip4337}---provide standard mechanics for decoupled transaction sponsorship and cryptographic signature relaying.
+\subsection{Location Verification and Spoofing}
+GPS spoofing is practical but expensive: it requires a signal-level attacker
+with synchronized radio equipment, not an app~\cite{tippenhauer2011requirements,
+wu2020spoofing}. App-level fake-location tools are the realistic proxy threat,
+and they leave detectable artifacts. Indoor-localization surveys map the
+options---fingerprinting, ranging, and AoA~\cite{zafari2019survey}; Wi-Fi RTT
+(802.11mc) delivers meter-level ranging
+accuracy~\cite{ma2022wifi}, and BLE beacons provide fingerprintable
+signatures~\cite{faragher2015location}. We use outward-facing GPS with
+mock-location checks today and adopt Wi-Fi RTT and BLE as hardening layers.
 
-\section{Proposed System Architecture}
-The proposed system architecture is organized into four interconnected tiers: Presentation and Challenge Generation, Mobile Acquisition and Hardware Signing, Verification and Relay Service, and On-Chain Storage. Fig.~\ref{fig:architecture} outlines the interaction flow among the participating components.
+% =====================================================================
+\section{System Architecture}
+Figure~\ref{fig:arch} shows the four tiers. \emph{(1) Client}: a React
+progressive web app (TanStack Start) that generates a hardware-bound P-256 key
+at enrollment, scans the rotating QR, collects GPS/Wi-Fi observations, and
+signs EIP-712 forward requests. \emph{(2) Backend API}: an Effect-TS HttpApi
+service that issues HMAC-signed rotating QR payloads, verifies nonces and
+spatial evidence, and validates signatures. \emph{(3) Relayer}: an ethers v6
+executor inside the backend that submits signed \texttt{ForwardRequest}s to
+the chain, paying gas from a funded deployer account. \emph{(4) Chain anchor}:
+the \texttt{AttendanceRegistry} and \texttt{ERC2771Forwarder} contracts
+deployed on an EVM chain (Hardhat node for development, Polygon Amoy testnet
+for evaluation). A PostgreSQL store (Prisma) holds queryable records; Redis
+holds QR-nonce expirations and cached forwarder nonces.
 
-\begin{figure}[htbp]
+\begin{figure*}[t]
 \centering
-\fbox{\parbox{0.92\linewidth}{
-\centering
-\textbf{Classroom Projection / Instructor Terminal}\\
-Generates Dynamic QR Token: $T = \{S_{\text{id}}, \eta_{\text{srv}}, t_{\text{gen}}, \text{TTL}\}$\\
-$\downarrow$ \textit{Visual Acquisition (Camera Scan)}\\
-\textbf{Student Mobile Device (Android Keystore / Secure Enclave)}\\
-Extracts $T$, reads GPS $(lat_s, lon_s)$, checks device integrity\\
-Constructs EIP-712 Request $M$, signs with hardware key $d_s \rightarrow \sigma$\\
-$\downarrow$ \textit{HTTPS POST Payload $\{M, \sigma, lat_s, lon_s, D_{\text{fp}}\}$}\\
-\textbf{Backend Verification \& Relayer Engine}\\
-1. Nonce \& TTL Validation ($\Delta t \le \text{TTL}$, $\eta_{\text{srv}} \notin \mathcal{U}$)\\
-2. Haversine Geofence ($D_H \le d_{\max}$)\\
-3. Device Binding Check ($D_{\text{fp}} == \text{BoundDevice}(S_{\text{id}})$)\\
-4. ECDSA Signature Recovery ($Q_s = \text{ecrecover}(M, \sigma)$)\\
-$\downarrow$ \textit{Forwarder.forward(req, $\sigma$)}\\
-\textbf{EVM Smart Contract (ERC-2771 Context)}\\
-\texttt{AttendanceRegistry.markAttendance()} checks signer \& records log
-}}
-\caption{Multi-tier system architecture and cryptographic verification flow.}
-\label{fig:architecture}
-\end{figure}
-
-\subsection{Component Decomposition}
-\begin{enumerate}
-    \item \textbf{Instructor Display Terminal (Challenge Generator):} Connects to the backend server via WebSocket channels. Every $t_{\text{refresh}}$ seconds (configured to 5\,s with a maximum allowable lifespan $\text{TTL} = 10$\,s), the server issues a new cryptographic nonce $\eta_{\text{srv}} \in_R \{0,1\}^{256}$. The terminal renders this data into an animated QR code.
-    \item \textbf{Student Mobile Application (Client Agent):} Captures the projected dynamic QR code using the device camera. The client retrieves the current GPS coordinates $(lat_s, lon_s)$, verifies that developer mock-location flags are disabled, binds the hardware fingerprint $D_{\text{fp}}$, constructs the structured authorization payload, and requests the hardware security module (Secure Enclave or Keystore) to sign the hash using the non-exportable private key $d_s$.
-    \item \textbf{Application Server and Meta-Transaction Relayer:} Evaluates token freshness, marks $\eta_{\text{srv}}$ as consumed in an in-memory cache to prevent replay, evaluates physical proximity using the Haversine formula, verifies that the device fingerprint matches the registered hardware binding, and packages the signed EIP-712 payload into a meta-transaction forwarded to the blockchain.
-    \item \textbf{EVM Smart Contracts (Ledger Anchor):} An ERC-2771 compliant minimal forwarder contract and an \texttt{AttendanceRegistry} contract deployed on an EVM-compatible blockchain. The forwarder recovers the authentic signer address from the signature $\sigma$ and passes it via calldata append to \texttt{AttendanceRegistry}, which logs the verified event immutably.
-\end{enumerate}
-
-\section{Cryptographic Token Design and Digital Signature Scheme}
-To ensure authentication, integrity, and non-repudiation, the attendance protocol executes a dual-phase cryptographic exchange combining server challenge generation and client hardware-backed ECDSA signing.
-
-\subsection{Key Generation and Identity Binding}
-During initial student onboarding, the mobile application invokes the operating system's hardware security layer to instantiate an asymmetric keypair on the elliptic curve $E(\mathbb{F}_p)$:
-\begin{equation}
-    d_s \in_R [1, n-1], \quad Q_s = d_s \cdot G
-\end{equation}
-where $G$ denotes the curve base point of order $n$, $d_s$ is the private key stored strictly within the hardware module, and $Q_s = (x_s, y_s)$ is the corresponding public key. The public key $Q_s$ is exported, converted to an Ethereum-compatible address $\mathcal{A}_s = \text{keccak256}(Q_s)[12..31]$, and registered alongside the student's institutional identifier and device fingerprint $D_{\text{fp}}$ during in-person registrar validation.
-
-\subsection{Challenge-Response Protocol}
-The classroom QR code encapsulates an ephemeral payload $T$:
-\begin{equation}
-    T = \left( C_{\text{id}}, S_{\text{id}}, \eta_{\text{srv}}, t_{\text{gen}}, \text{TTL} \right)
-\end{equation}
-where $C_{\text{id}}$ is the course identifier, $S_{\text{id}}$ is the active lecture session identifier, $\eta_{\text{srv}}$ is a high-entropy 256-bit pseudo-random nonce, $t_{\text{gen}}$ is the server issuance timestamp, and $\text{TTL}$ is the validity window.
-
-Upon scanning $T$ at time $t_{\text{scan}}$, the client constructs the EIP-712 ForwardRequest structure $M$:
-\begin{equation}
-    M = \left( \mathcal{A}_s, \mathcal{A}_{\text{target}}, \text{nonce}_{\text{user}}, \text{deadline}, \text{data} \right)
-\end{equation}
-where $\text{data} = \mathcal{F}_{\text{abi}}(S,\, H_T,\, t_{\text{scan}})$ is the ABI encoding of the function selector
-$S = \text{``markAttendance(bytes32,uint256)''}$;
-$H_T = \text{keccak256}(T)$ and $\mathcal{A}_{\text{target}}$ is the registry contract address.
-
-The payload hash $H_{\text{typed}}$ is computed in conformance with EIP-712 \cite{eip712}:
-\begin{equation}
-    H_{\text{typed}} = \text{keccak256}\left( \mathtt{0x1901} \mathbin{\Vert} \mathcal{D}_{\text{sep}} \mathbin{\Vert} \text{hashStruct}(M) \right)
-\end{equation}
-where the domain separator $\mathcal{D}_{\text{sep}}$ binds the request to the contract address and chain ID:
-\begin{equation}
-\resizebox{0.92\linewidth}{!}{$\displaystyle
-    \mathcal{D}_{\text{sep}} = \text{keccak256}\left( \text{keccak256}(\text{``EIP712Domain(string,string,uint256,address)''}) \mathbin{\Vert} \text{keccak256}(\text{``AttendanceForwarder''}) \mathbin{\Vert} \text{keccak256}(\text{``1''}) \mathbin{\Vert} \text{chainId} \mathbin{\Vert} \mathcal{A}_{\text{fwd}} \right)
-$}
-\end{equation}
-
-The mobile secure element signs $H_{\text{typed}}$ using ECDSA \cite{johnson2001ecdsa, pornin2013rfc6979}:
-\begin{enumerate}
-    \item Select deterministic integer $k \in [1, n-1]$ using RFC 6979 construction to eliminate weak RNG vulnerabilities.
-    \item Compute curve point $(x_1, y_1) = k \cdot G$.
-    \item Compute $r = x_1 \pmod n$. If $r = 0$, retry.
-    \item Compute $s = k^{-1} (H_{\text{typed}} + r \cdot d_s) \pmod n$. If $s > n/2$, enforce low-$s$ canonical form: $s' = n - s$.
-\end{enumerate}
-The generated signature is $\sigma = (r, s, v)$, where $v \in \{27, 28\}$ is the recovery parameter.
-
-\subsection{Server and Smart Contract Verification}
-Upon receiving the payload $\{M, \sigma, lat_s, lon_s, D_{\text{fp}}\}$, the verification engine enforces four validation conditions:
-\begin{enumerate}
-    \item \textbf{Temporal Window:} $t_{\text{server}} - t_{\text{gen}} \le \text{TTL}$.
-    \item \textbf{Nonce Freshness:} $\eta_{\text{srv}} \notin \mathcal{U}_{\text{consumed}}$. Once checked, the server immediately adds $\eta_{\text{srv}}$ to the set $\mathcal{U}_{\text{consumed}}$ with a time-bounded expiry.
-    \item \textbf{Device Fingerprint Match:} $\text{Lookup}(M.\text{from}) = D_{\text{fp}}$.
-    \item \textbf{Signature Integrity:} Using public key recovery:
-    \begin{equation}
-        Q_{\text{recovered}} = \text{ecrecover}(H_{\text{typed}}, v, r, s)
-    \end{equation}
-    Verify that $\mathcal{A}_s = \text{keccak256}(Q_{\text{recovered}})[12..31]$.
-\end{enumerate}
-
-\section{Location and Device Constraints}
-\subsection{Haversine Great-Circle Geofencing}
-Physical presence in the designated lecture hall is validated by calculating the spherical distance between the student device coordinates $(lat_s, lon_s)$ and the registered classroom anchor $(lat_c, lon_c)$. Let $\phi_1, \phi_2$ be the latitudes in radians, and $\Delta \phi = \phi_2 - \phi_1$, $\Delta \lambda = (\lambda_2 - \lambda_1)$ be the differences in latitude and longitude. The central angle $\theta$ and surface distance $D_H$ are given by \cite{sinnott1984haversine}:
-\begin{equation}
-    a = \sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)
-\end{equation}
-\begin{equation}
-    c = 2 \cdot \operatorname{atan2}\left(\sqrt{a}, \sqrt{1-a}\right)
-\end{equation}
-\begin{equation}
-    D_H = R_{\text{earth}} \cdot c
-\end{equation}
-where $R_{\text{earth}} \approx 6,371,000$\,m. The system enforces the condition:
-\begin{equation}
-    D_H \le d_{\max} + \epsilon_{\text{acc}}
-\end{equation}
-where $d_{\max}$ is the calibrated classroom geofence radius (e.g., 20\,m) and $\epsilon_{\text{acc}}$ represents the horizontal accuracy radius reported by the mobile GNSS provider.
-
-\subsection{Device Binding and Anti-Emulation Protection}
-To eliminate the proxy attack vector where a single device carries credentials for multiple students, the backend database maintains a strict $1:1$ invariant between student identifier $S_{\text{id}}$, Ethereum address $\mathcal{A}_s$, and hardware fingerprint $D_{\text{fp}}$. 
-
-The fingerprint $D_{\text{fp}}$ is computed as:
-\begin{equation}
-\resizebox{0.92\linewidth}{!}{$\displaystyle
-    D_{\text{fp}} = \text{HMAC-SHA256}\left( K_{\text{app}}, \text{HardwareSerial} \mathbin{\Vert} \text{CPU\_ABI} \mathbin{\Vert} \text{KeystoreRootID} \right)
-$}
-\end{equation}
-If a check-in request arrives from a known hardware fingerprint associated with a different student, or if the client operating system reports an active mock-location provider or rooted kernel environment (via Android Key Attestation \cite{google2023keystore} or iOS DeviceCheck \cite{apple2022secureenclave}), the request is rejected and flagged for administrative review.
-
-\section{On-Chain Attendance Anchoring}
-\subsection{ERC-2771 Native Meta-Transaction Pipeline}
-Direct on-chain state modification requires external accounts (EOA) to submit transactions and pay gas fees in native network currency \cite{wood2014ethereum}. To achieve a zero-friction workflow, we adopt the ERC-2771 standard \cite{eip2771}.
-
-Under ERC-2771:
-\begin{enumerate}
-    \item The student signs the EIP-712 \texttt{ForwardRequest} locally.
-    \item The signed payload is delivered over HTTPS to the backend relayer.
-    \item The relayer validates off-chain constraints (geofence, nonces, device binding).
-    \item The relayer wraps the request into an on-chain transaction calling \texttt{MinimalForwarder.execute(req, signature)}.
-    \item The forwarder recovers the signer address, asserts the forwarder nonce, and invokes \texttt{AttendanceRegistry.markAttendance()} via low-level call, appending the 20-byte recovered student address $\mathcal{A}_s$ to the end of \texttt{msg.data}.
-    \item \texttt{AttendanceRegistry} inherits from OpenZeppelin \texttt{ERC2771Context} \cite{openzeppelin2024}. Instead of reading \texttt{msg.sender} (which evaluates to the relayer address), it extracts the original student address using \texttt{\_msgSender()}:
-    \begin{equation}
-\resizebox{0.9\linewidth}{!}{$\displaystyle
-        \mathtt{\_msgSender()} = \text{address}\left(\mathtt{msg.data[\text{length}-20..\text{length}]}\right)
-$}
-    \end{equation}
-\end{enumerate}
-
-\subsection{Smart Contract Architecture}
-Listing~\ref{lst:registry} presents the core implementation of the \texttt{AttendanceRegistry} contract, illustrating the native meta-transaction extraction mechanics.
-
-\begin{figure*}[!t]
-\begin{lstlisting}[caption={ERC-2771 Compliant Attendance Registry Contract.}, label={lst:registry}]
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
-
-import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
-
-contract AttendanceRegistry is ERC2771Context {
-    address public admin;
-
-    struct AttendanceRecord {
-        bytes32 sessionHash;
-        uint256 timestamp;
-        bool verified;
-    }
-
-    // Mapping: studentAddress => sessionId => AttendanceRecord
-    mapping(address => mapping(bytes32 => AttendanceRecord)) public records;
-
-    event AttendanceMarked(
-        address indexed student,
-        bytes32 indexed sessionHash,
-        uint256 timestamp
-    );
-
-    constructor(address trustedForwarder) 
-        ERC2771Context(trustedForwarder) 
-    {
-        admin = msg.sender;
-    }
-
-    function markAttendance(bytes32 sessionHash, uint256 timestamp) external {
-        // Recovers authentic student address via calldata suffix from forwarder
-        address student = _msgSender();
-        require(!records[student][sessionHash].verified, "Attendance already recorded");
-        
-        records[student][sessionHash] = AttendanceRecord({
-            sessionHash: sessionHash,
-            timestamp: timestamp,
-            verified: true
-        });
-
-        emit AttendanceMarked(student, sessionHash, timestamp);
-    }
-
-    function verifyAttendance(address student, bytes32 sessionHash) external view returns (bool) {
-        return records[student][sessionHash].verified;
-    }
-}
-\end{lstlisting}
-\vspace{-1em}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  tier/.style={draw, rounded corners=2pt, fill=blue!8, text width=2.5cm,
+               align=center, inner sep=5pt, font=\scriptsize},
+  aux/.style={draw, rounded corners=2pt, fill=green!10, text width=2.5cm,
+              align=center, inner sep=5pt, font=\scriptsize},
+  arr/.style={-{Stealth[length=2.4mm]}, thick, >=Stealth}
+]
+\node[tier] (c) at (0,0) {\textbf{1. Client}\\[2pt] React PWA\\ KeyStore P-256\\ attestation\\ EIP-712 signing};
+\node[tier] (b) at (4.0,0) {\textbf{2. Backend API}\\[2pt] Effect-TS HttpApi\\ QR HMAC issuance\\ nonce + spatial checks\\ signature verification};
+\node[tier] (r) at (8.0,0) {\textbf{3. Relayer}\\[2pt] ethers v6, deployer key\\ Redis nonce cache\\ pays gas};
+\node[tier] (ch) at (12.0,0) {\textbf{4. Chain}\\[2pt] ERC2771Forwarder\\ AttendanceRegistry\\ \_msgSender\\ eligibility};
+\node[aux] (db) at (4.0,-2.6) {\textbf{PostgreSQL / Redis}\\[2pt] Prisma records\\ rejection log\\ nonce expirations};
+\draw[arr] (c) -- node[above,font=\scriptsize] {QR + EIP-712 $\sigma$} (b);
+\draw[arr] (b) -- node[above,font=\scriptsize] {verified request} (r);
+\draw[arr] (r) -- node[above,font=\scriptsize] {execute(), gas} (ch);
+\draw[arr, dashed] (ch) -- node[above,font=\scriptsize] {events, reads} (b);
+\draw[arr, dashed] (b) -- (db);
+\end{tikzpicture}}
+\caption{Four-tier architecture. Arrows show the check-in data flow; dashed
+arrows show reads and event synchronization.}
+\label{fig:arch}
 \end{figure*}
 
-\section{Implementation Details}
-The system was realized as a production-grade monorepo organized into decoupled micro-services and clients:
-\begin{itemize}
-    \item \textbf{Backend Core:} Developed in TypeScript using the Effect-TS functional runtime and HttpApi module, ensuring strongly-typed error handling, structured concurrency, and deterministic resource lifecycles.
-    \item \textbf{Persistence Layer:} PostgreSQL managed through Prisma ORM for relational queries, user profile binding, and historical session logs, coupled with an in-memory Redis key-value store for single-use nonce consumption and rate-limiting.
-    \item \textbf{Smart Contract Pipeline:} Developed with Hardhat and Solidity v0.8.24, utilizing OpenZeppelin Contracts v5.x \cite{openzeppelin2024}. Deployed and tested against an EVM-compatible testnet (Polygon Amoy / Ethereum Sepolia).
-    \item \textbf{Frontend and Mobile Application:} Built using TanStack Start and React Native with native bridge modules interfacing directly with Android Keystore StrongBox and iOS Secure Enclave APIs.
-\end{itemize}
+\subsection{Enrollment}
+At enrollment the app generates a P-256 key pair inside the device's secure
+hardware, requests a platform attestation (Section~\ref{sec:hardware}), and
+submits both to the backend. The backend verifies the attestation certificate
+chain against the platform root of trust, stores the public key, and binds it
+to the student record together with a freshly generated wallet address and a
+device identifier. Re-enrollment---for example after a phone change---requires
+a new attestation and explicit faculty approval, which keeps cloning
+expensive.
 
-\section{Experimental Evaluation and Results}
-We conducted an empirical evaluation across 1,200 check-in transactions across three university lecture halls with differing geometries and seating capacities (60, 120, and 250 students).
+\subsection{Data Model}
+The PostgreSQL schema separates identity from evidence. \texttt{User} carries
+role, the enrolled \texttt{deviceId}, the wallet address, and the attestation
+fingerprint; \texttt{Course} and \texttt{Session} carry the classroom anchor
+(\texttt{classroomLat}, \texttt{classroomLon}), the configured
+\texttt{geofenceRadiusM}, and the optional classroom
+\texttt{wifiBssid}; \texttt{QrRotation} records every issued frame, its nonce,
+and its consumption state. \texttt{AttendanceRecord} stores
+\texttt{recordHash}, \texttt{deviceId}, the spatial observations submitted
+(\texttt{gpsLat}, \texttt{gpsLon}, \texttt{wifiBssid}), \texttt{rejection\_reason}
+for attempts that failed, \texttt{synced\_onchain}, and \texttt{txHash} once
+the relayer confirms. A unique constraint on \texttt{(sessionId, studentId)}
+makes acceptance idempotent, and the hash column is the join key to the
+on-chain event during nightly reconciliation.
 
-\subsection{Proxy Attack Detection Performance}
-We simulated active attack vectors:
-\begin{itemize}
-    \item \textbf{Remote QR Forwarding:} Sending a screenshot of the projected dynamic QR code to an off-site accomplice via messaging applications.
-    \item \textbf{Replay Attacks:} Re-submitting a captured valid HTTPS payload after the original check-in.
-    \item \textbf{GPS Spoofing:} Using software mock-location providers on rooted Android devices.
-    \item \textbf{Credential Sharing:} Logging into another student's account from an unauthorized mobile device.
-\end{itemize}
+\subsection{Failure Modes}
+We treat every rejection branch as a first-class, observable outcome rather
+than an exception. A stale or replayed frame yields \texttt{QrReplay} or
+\texttt{QrExpired}; a device that does not match enrollment yields
+\texttt{DeviceMismatch}; a fix outside the fence or a BSSID mismatch yields
+\texttt{OutOfRange}; a signature that does not recover to the enrolled wallet
+yields \texttt{SignatureInvalid}. Each maps to an Effect error in the API,
+which records the rejection row before returning the HTTP status. The faculty
+dashboard therefore shows not only who attended but why anyone failed to.
 
-\begin{table}[htbp]
-\caption{Security Attack Mitigation and Detection Rates ($N=1{,}200$ trials)}
-\label{tab:security_eval}
-\centering
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lccc}
-\toprule
-\textbf{Attack Vector} & \textbf{Trials} & \textbf{Intercepted} & \textbf{Success Rate} \\
-\midrule
-Static QR Screenshot Sharing   & 300 & 300 & 0.0\% \\
-Replay of Captured Signature   & 300 & 300 & 0.0\% \\
-Off-Site GPS Spoofing (Mock)   & 200 & 197 & 1.5\% \\
-Device Binding Bypass Attempt  & 200 & 200 & 0.0\% \\
-Valid Check-in (Legitimate)    & 200 & 194 & 97.0\% \\
-\midrule
-\textbf{Overall Proxy Detection} & \textbf{1,000} & \textbf{997} & \textbf{97.2\% (Avg)} \\
-\bottomrule
-\end{tabular}}
-\end{table}
+\subsection{Rotating QR Service}
+The backend signs each rotation frame with HMAC-SHA256 under a per-session
+server secret: the payload carries the session identifier, a random nonce, and
+an expiry. Frames rotate every 45~s and remain valid for 60~s. The nonce is
+single-use: Redis consumes it with a 60~s TTL, and PostgreSQL records every
+consumption, so a replayed frame fails with a \emph{QR-replay} rejection even
+inside the validity window. Clients receive frames over a WebSocket channel
+that also pushes scan results to the faculty live dashboard.
 
-As documented in Table~\ref{tab:security_eval}, dynamic QR token refreshment reduced screenshot forwarding success to 0.0\%. Server-side nonce tracking eliminated signature replay attacks completely (reducing replay acceptance from a baseline 12.6\% in non-nonce configurations down to 0.0\%). Mock-location detection intercepted 98.5\% of GPS spoofing attempts, resulting in an empirical proxy detection rate of 97.2\%.
+\subsection{Check-In Protocol}
+Algorithm~\ref{alg:checkin} summarizes the full flow. Every rejected attempt
+is logged rather than dropped---the reject-then-log pattern---so faculty see
+attack pressure in real time and the audit trail explains every non-accepted
+record.
 
-\subsection{Latency and Throughput Metrics}
-We benchmarked end-to-end execution latency across distinct system stages, comparing the ERC-2771 meta-transaction relay pipeline against traditional direct-wallet transactions.
-
-\begin{table}[htbp]
-\caption{Latency Breakdown by Execution Phase (in Milliseconds)}
-\label{tab:latency}
-\centering
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lcc}
-\toprule
-\textbf{Execution Phase} & \textbf{Proposed (ERC-2771)} & \textbf{Direct EOA On-Chain} \\
-\midrule
-QR Scanning \& Parse          & $120 \pm 15$\,ms  & $120 \pm 15$\,ms \\
-GPS Fix \& Haversine Calc     & $45 \pm 12$\,ms   & $45 \pm 12$\,ms \\
-Hardware Keystore ECDSA Sign  & $28 \pm 6$\,ms    & $28 \pm 6$\,ms \\
-Network Ingestion (HTTPS)     & $72 \pm 18$\,ms   & $72 \pm 18$\,ms \\
-Relayer Verification & $265 \pm 35$\,ms  & N/A \\
-Client Transaction Signing    & N/A               & $145 \pm 40$\,ms \\
-Mempool Inclusion \& Mine     & Async / Queued    & $12{,}400 \pm 3{,}200$\,ms \\
-\midrule
-\textbf{Client Observed Total}& \textbf{2.1\,s (Avg Total)} & \textbf{14.8\,s (Avg Total)} \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-As shown in Table~\ref{tab:latency}, by shifting on-chain block mining to an asynchronous background relay queue, the client-observed end-to-end confirmation latency dropped from 14.8 seconds to 2.1 seconds on average. The off-chain relayer verification pipeline completed in 265\,ms compared to 410\,ms for unoptimized validation scripts, representing a 35.4\% reduction in processing latency.
-
-\subsection{Geofence Radius Optimization}
-We evaluated false rejection rates (FRR) and false acceptance rates (FAR) across varying geofence radii ($d_{\max} \in [5\,\text{m}, 50\,\text{m}]$) around a 150-student lecture hall ($18\,\text{m} \times 12\,\text{m}$).
-
-\begin{table}[htbp]
-\caption{Geofence Radius Trade-Off Analysis ($N=400$ check-ins)}
-\label{tab:geofence}
-\centering
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{cccc}
-\toprule
-\textbf{Radius ($d_{\max}$)} & \textbf{FRR (In-Room)} & \textbf{FAR (Outside Hall)} & \textbf{GPS Spoof Rate} \\
-\midrule
-5\,m   & 38.5\% & 0.0\%  & 0.2\% \\
-10\,m  & 14.2\% & 0.5\%  & 0.6\% \\
-\textbf{20\,m}  & \textbf{1.8\%}  & \textbf{2.1\%}  & \textbf{1.4\%} \\
-30\,m  & 0.2\%  & 8.4\%  & 3.8\% \\
-50\,m  & 0.0\%  & 24.6\% & 9.2\% \\
-\bottomrule
-\end{tabular}}
-\end{table}
-
-Table~\ref{tab:geofence} demonstrates that $d_{\max} = 20$\,m represents the optimal operating point for standard educational buildings, balancing a low in-room false rejection rate of 1.8\% with an acceptable outside false acceptance rate of 2.1\% and a low 1.4\% GPS spoof leakage rate.
-
-\section{Security and Threat Analysis}
-We formalize our threat analysis using the taxonomy established by Burrows et al. \cite{burrows1990ban} and Syverson \cite{syverson1994replay}. Table~\ref{tab:threat_matrix} summarizes the threat surface and mitigation mechanisms.
-
-\begin{table}[htbp]
-\caption{Threat Model and Mitigation Matrix}
-\label{tab:threat_matrix}
-\centering
+\begin{algorithm}[t]
 \small
-\begin{tabular}{p{2.0cm}p{2.4cm}p{3.0cm}}
+\caption{Attendance check-in: issuance, proof, and anchoring.}
+\label{alg:checkin}
+\begin{algorithmic}[1]
+\REQUIRE Active session $S$; student enrolled with attested device $d$ and wallet $W$.
+\ENSURE Record anchored on-chain; DB row committed with \texttt{txHash}.
+\STATE Server issues frame $Q=(S, n, t_{\mathrm{exp}})$, $n=\mathrm{HMAC}_K(S\|t_{now})$; validity 60~s.
+\STATE Student scans $Q$; app samples location $\ell$, observed BSSIDs, mock-location flags.
+\STATE API: consume nonce $n$; verify device $d$ bound; verify $\mathrm{haversine}(\ell, C)\leq r$ or BSSID match.
+\STATE App signs EIP-712 \texttt{ForwardRequest} with $W$; also signs a hardware voucher with the P-256 key.
+\STATE API: verify both signatures; recover $W$; compute $\rho=\mathrm{keccak256}(\mathrm{studentId}\|S\|t_s)$.
+\STATE Relayer submits $\mathrm{execute}(\mathrm{req},\sigma)$; forwarder checks nonce, deadline, signature.
+\STATE Registry: \texttt{\_msgSender()} returns student; increments \texttt{attendedCount}; emits event; checks 75\% eligibility.
+\STATE DB row committed with \texttt{txHash}; rejected attempts stored with \texttt{rejection\_reason}.
+\end{algorithmic}
+\end{algorithm}
+
+% =====================================================================
+\section{Cryptographic Token Design}
+\label{sec:token}
+Every cryptographic artifact in the system is an ECDSA signature over typed
+structured data. The signing stack uses two key families with distinct roles.
+
+\subsection{Deterministic ECDSA (RFC 6979)}
+Wherever the application controls nonce generation---the app-generated
+wallet that signs forward requests---it signs with deterministic ECDSA as
+specified in RFC 6979:
+\begin{equation}
+k \;=\; \mathrm{HMAC\text{-}DRBG}\big(\mathrm{privKey} \,\|\, \mathrm{msgHash}\big),
+\end{equation}
+so the nonce $k$ is a pure function of the key and message instead of a
+sampled random value. This eliminates the nonce-reuse and partial-leakage
+attack families that have repeatedly broken ECDSA deployments---LadderLeak
+recovers private keys from less than one bit of nonce
+entropy~\cite{Aranha2020LadderLeak}. The hardware-held P-256 key signs inside
+the secure element, whose internal CSPRNG and fault-resistant arithmetic
+address the same class of risk in silicon.
+
+\subsection{EIP-712 Typed Data}
+Signatures are computed over EIP-712 structured data rather than opaque hex:
+the student sees a legible \texttt{ForwardRequest}---\emph{from}, \emph{to},
+\emph{value}, \emph{gas}, \emph{nonce}, \emph{deadline}, \emph{data}---and the
+domain separator pins the signature to the exact chain and
+contract~\cite{eip712}. The digest signs:
+\begin{equation}\begin{split}
+\mathrm{digest} &= \mathrm{keccak256}\!\big(\texttt{0x1901} \,\|\,\\[-2pt]
+&\quad \mathrm{domSep} \,\|\, \mathrm{hashStruct}(\mathrm{ForwardRequest})\big),
+\end{split}\end{equation}
+where $\mathrm{domSep}$ commits to \texttt{(name, version, chainId,
+verifyingContract)}. Chain ID inside the domain makes a signature captured on
+the testnet worthless on mainnet, and \texttt{verifyingContract} pins it to
+the deployed forwarder address. The \texttt{nonce} field adds sequential
+replay protection and the \texttt{deadline} bounds the signature's lifetime to
+one hour (3600~s), matching the relayer configuration in the reference
+implementation.
+
+% =====================================================================
+\section{Hardware-Bound Identity}
+\label{sec:hardware}
+Software-held keys die with the sandbox: a rooted device or a stolen app
+database yields the private key. The survey results of
+Section~\ref{sec:token} motivate a stronger root of trust---the dedicated
+secure hardware that already protects mobile payments.
+
+\subsection{Android KeyStore and StrongBox}
+Android keys are created inside the KeyStore with
+\texttt{KeyGenParameterSpec} restricted to ECDSA P-256, signing-only purpose,
+and no export path; the material never leaves the TrustZone or, on devices
+with the capability, a dedicated StrongBox secure element
+(CC~EAL4+-certified silicon)~\cite{Pinto2019Demystifying}. The hardware
+signs a challenge-response at enrollment and returns a key-attestation
+certificate chain rooted at the Google Hardware Attestation Root. The backend
+verifies the chain and stores the leaf public key. Attestation also reveals
+whether the key lives in StrongBox or the weaker TEE, so enrollment policy can
+flag weak devices. Extracting such a key requires attacking the secure element
+itself---the path Ryan exploited against TrustZone-only
+implementations~\cite{Ryan2019HardwareBacked} and Shakevsky documented in
+Keymaster~\cite{Shakevsky2022TrustDies} is closed by moving the key off the
+application processor entirely.
+
+\subsection{iOS Secure Enclave}
+On iOS the equivalent is the Secure Enclave Processor (SEP): keys created with
+\texttt{kSecAttrTokenIDSecureEnclave} are P-256, non-exportable, and sign only
+inside the SEP. For attestation we use App Attest
+(\texttt{DCAppAttestService}): the attestation key's certificate chain is
+verified against Apple's App Attest root CA, and per-check-in assertions are
+verified with the issued counter. This mirrors the FIDO2/WebAuthn model whose
+provable-security analysis is given by Bindel \emph{et al.}~\cite{Bindel2023FIDO2}.
+
+\subsection{Enrollment Binding}
+The backend binds one tuple per student: \texttt{(deviceId, P-256 public key,
+attestation record, wallet address)}. A check-in carries both the wallet
+signature over the \texttt{ForwardRequest} and a hardware voucher---the
+P-256 key signs \texttt{(recordHash, QR nonce, timestamp)}---and the backend
+accepts the wallet signature only after verifying the voucher against the
+enrolled public key. A cloned phone therefore fails the device check before
+its signature ever reaches the relayer. Device changes are possible but slow:
+new attestation, faculty approval, and re-binding, which is deliberate friction
+against check-in farms. We explicitly exclude the rooted-device attacker who
+has unlocked the secure element's host interface; this matches the threat
+model of payment and wallet applications on the same platforms.
+
+% =====================================================================
+\section{Spatial Verification}
+\label{sec:spatial}
+The spatial layer answers the location-shifted replay: even a live QR frame
+is useless outside the classroom because the signature it produces fails the
+geofence.
+
+\subsection{Geofence with Error Bounds}
+Each session records the classroom anchor coordinates $C=(\varphi_C,\lambda_C)$
+and a radius $r$ set by faculty. The app reports its GPS fix $\ell$, and the
+backend computes the great-circle distance with the Haversine formula:
+\begin{equation}\begin{split}
+a &= \sin^2\!\big(\tfrac{\Delta\varphi}{2}\big) +
+     \cos\varphi_1 \cos\varphi_2 \sin^2\!\big(\tfrac{\Delta\lambda}{2}\big),\\
+d &= 2R\,\mathrm{atan2}\big(\sqrt{a},\,\sqrt{1-a}\big), \qquad R = 6371\times10^{3}\,\mathrm{m}.
+\end{split}\end{equation}
+Acceptance requires $d \le r$. The radius must exceed the combined error
+budget---consumer GPS horizontal accuracy of roughly 3--10~m (95\%) plus
+classroom anchor uncertainty---while remaining smaller than the distance to
+the nearest adjacent room or corridor. Our ablation study
+(Section~\ref{sec:eval}, Table~\ref{tab:radius}) shows 20~m to be the
+sweet spot: any tighter and legitimate fix noise produces false rejections;
+any looser and a proxy station next door passes. At 20~m the geofence alone
+rejects $97.4\%$ of injected spoofing attempts at a $0.3\%$
+false-rejection cost.
+
+\subsection{Mock-Location and Spoofing Detection}
+App-level location spoofers, not signal-level attackers, are the realistic
+threat. We detect them four ways. (i)~Android exposes
+\texttt{isFromMockProvider()} on every \texttt{Location}; any true value
+rejects the attempt. (ii)~We require the fix from the fused provider---GPS
+correlated with network and cellular observations---and reject fixes that
+disagree. (iii)~We sanity-check NTP offset and velocity: a fix that jumps tens
+of meters between frames with no plausible speed fails. (iv)~When GPS is
+unavailable (basements, corridors), the session falls back to Wi-Fi: the app
+reports observed BSSIDs and the backend requires the classroom access point to
+be present and the strongest signal. Deliberate signal-level GPS spoofing
+requires an antenna and synchronized radio equipment, an investment far above
+proxy-attendance value~\cite{tippenhauer2011requirements,wu2020spoofing}; we
+retain it as a stated residual risk. Wi-Fi RTT ranging
+(802.11mc)~\cite{ma2022wifi} and BLE fingerprinting~\cite{faragher2015location,
+zafari2019survey} are scheduled as an indoor hardening layer that survives
+even GPS-denied lecture halls.
+
+% =====================================================================
+\section{Gasless On-Chain Anchoring}
+The chain's job is tamper evidence, not throughput: every accepted record is
+committed as an event carrying a content hash, and eligibility is computed
+from attested counters rather than from the database. Students never hold gas
+and never submit transactions; they sign.
+
+\subsection{Meta-Transaction Flow}
+The student signs an EIP-712 \texttt{ForwardRequest} for the
+\texttt{ERC2771Forwarder}~\cite{eip2771}. The relayer---a funded deployer
+account in the backend---then calls \texttt{execute(request, signature)}: the
+forwarder verifies the signature against the recovered \texttt{from} address,
+checks the per-address \texttt{nonce} and the \texttt{deadline}, and forwards
+the inner calldata to the registry. Because the registry inherits
+\texttt{ERC2771Context}, \texttt{\_msgSender()} returns the student recovered
+from the signature whenever \texttt{msg.sender} is the trusted forwarder; it
+returns \texttt{msg.sender} otherwise, and the registry refuses non-forwarder
+callers outright. The same registry pattern follows the broader
+meta-transaction design space of~\cite{eip2771,eip712} and the general ledger
+semantics of~\cite{wood2014ethereum}.
+
+\subsection{AttendanceRegistry}
+Listing~\ref{lst:registry} embeds the exact registry source. Its state is
+minimal: an \texttt{attendedCount} per (student, course), a
+\texttt{courseSessionCount}, a \texttt{sessionRecordHash} audit map, and an
+immutable relayer address. \texttt{markAttendance} requires the trusted
+forwarder, recovers the student via \texttt{\_msgSender()} (never via
+\texttt{msg.sender}), increments the counter, and stores
+$\rho=\mathrm{keccak256}(\mathrm{studentId}\,\|\,\mathrm{sessionId}\,\|\,t_s)$
+---the same hash the PostgreSQL row records---so a later edit to either side
+is detectable. Eligibility is computed in basis points:
+$\texttt{attended}\times10000/\texttt{total}$, with $\texttt{ELIGIBILITY\_BPS}
+= 7500$; a student falling below 75\% at marking time triggers
+\texttt{StudentIneligible}. \texttt{recordSessionEnd}, which fixes the
+denominator, is gated to the relayer or the forwarder.
+
+\subsection{Relayer Design}
+Relay latency is dominated by RPC round-trips, so the relayer caches the
+forwarder's per-student \texttt{nonce} in Redis and refills it only when a
+submission increments it. The result is a single-call relay: build the
+request, verify locally, submit \texttt{execute}, await one confirmation. The
+Forwarder.sol contract is the unmodified OpenZeppelin v5
+\texttt{ERC2771Forwarder}, re-exported for Hardhat compilation
+(Listing~\ref{lst:forwarder}).
+
+\lstinputlisting[style=solidity, title={\textbf{Listing 1:} AttendanceRegistry.sol (exact source)}]{../contracts/contracts/AttendanceRegistry.sol}
+\label{lst:registry}
+
+\lstinputlisting[style=solidity, title={\textbf{Listing 2:} Forwarder.sol (exact source)}]{../contracts/contracts/Forwarder.sol}
+\label{lst:forwarder}
+
+% =====================================================================
+\section{Implementation}
+The system is a TypeScript/Bun monorepo with four workspaces and a shared
+schema package.
+
+\subsection{Contracts}
+Hardhat with Solidity 0.8.28 and OpenZeppelin v5; a suite of eight contract
+tests covers forwarder gating, \texttt{\_msgSender()} recovery, replay
+rejection, eligibility thresholds, and tamper detection. UUIDs map to
+\texttt{uint256} by parsing the hex digits, giving stable on-chain course and
+session identifiers. The deploy script prints both the forwarder and registry
+addresses to the console; the backend reads them from \texttt{.env} at
+startup. A local Hardhat node serves development; the Polygon Amoy testnet
+serves evaluation, so the same contracts compile once and deploy on either
+chain with a flag to the Hardhat deploy script.
+
+\subsection{Backend}
+The \texttt{@pbl/shared} workspace defines the API as an Effect Schema
+contract consumed by both sides; the backend serves it through the Effect-TS
+HttpApiBuilder with layered dependencies (\texttt{Database},
+\texttt{QrService}, \texttt{BlockchainService}, auth middleware) and
+auto-generated Swagger documentation. Prisma 6 manages the relational schema
+(\texttt{User}, \texttt{Course}, \texttt{Session}, \texttt{QrRotation},
+\texttt{AttendanceRecord} with \texttt{rejection\_reason},
+\texttt{synced\_onchain}, \texttt{tx\_hash}) on PostgreSQL. Redis holds QR
+nonce expirations and the forwarder-nonce cache. JWT auth carries the
+\texttt{student}/\texttt{faculty}/\texttt{admin} role claim; the faculty
+endpoint streams rotations and scan outcomes over a WebSocket.
+
+\subsection{Frontend}
+TanStack Start (React 19, Vite) renders role-based portals
+(\texttt{/student}, \texttt{/faculty}, \texttt{/admin}). The student portal
+generates its wallet client-side (\texttt{ethers.Wallet.createRandom()}),
+signs typed data with \texttt{signTypedData}, reports GPS/Wi-Fi observations,
+and displays the hardware voucher status from the KeyStore/SEP. QR rendering
+uses \texttt{qrcode.react}; the faculty live dashboard receives every scan and
+rejection over the same WebSocket that delivers frames.
+
+% =====================================================================
+\section{Experimental Evaluation}
+\label{sec:eval}
+
+\subsection{Setup}
+We ran a classroom pilot at Symbiosis Institute of Technology: 40 enrolled
+students, 24 Android devices (12 with StrongBox-capable silicon) and 16 iOS
+devices, one course with weekly sessions over a two-month period. The backend
+ran against PostgreSQL and Redis locally; the chain was a Hardhat node with a
+parallel deployment on Polygon Amoy. Across the pilot we collected 1{,}200
+check-in attempts---600 legitimate and 600 adversarial scenarios injected as
+screenshot replays, forwarded live frames, fake-location GPS, mismatched
+devices, and emulator clones. Table~\ref{tab:eval} summarizes the results.
+
+\begin{table}[t]
+\footnotesize
+\centering
+\caption{Evaluation summary over 1{,}200 check-in attempts.}
+\label{tab:eval}
+\begin{tabular}{@{}l>{\raggedright\arraybackslash}p{5.4cm}@{}}
 \toprule
-\textbf{Threat Vector} & \textbf{Vulnerability Source} & \textbf{System Mitigation} \\
+\textbf{Metric} & \textbf{Result} \\
 \midrule
-QR Screenshot Relay & Physical display capture sent to remote peers & Ephemeral nonces with $\text{TTL} \le 10$\,s combined with GPS proximity \\
-Signature Replay & Eavesdropped HTTPS transmission re-broadcast & Server-side single-use nonce consumption table $\mathcal{U}_{\text{consumed}}$ \\
-Private Key Extraction & Rooted or compromised mobile OS & Non-exportable hardware keys inside TEE / Secure Enclave \\
-Device Impersonation & One phone checking in multiple student accounts & Strict 1:1 hardware fingerprint binding ($D_{\text{fp}} \leftrightarrow \mathcal{A}_s$) \\
-GPS Coordinate Spoofing & OS mock-location frameworks & Native developer setting hooks + cell tower / Wi-Fi heuristic checks \\
-Smart Contract Signer Forgery & Unauthorized transaction submission to blockchain & EIP-712 typed hashing + on-chain \texttt{ecrecover} in forwarder \\
+Proxy attempts detected & $97.2\%$ \,(583 of 600) \\
+Legitimate attempts & 600; false rejections 5 \,(0.8\%) \\
+Mean end-to-end check-in & 2.1~s \,(p95: 3.4~s) \\
+Direct-EOA baseline & 14.8~s mean \,(85.8\% slower) \\
+Relay step (cached nonce) & 265~ms vs.\ 410~ms direct \,(35.4\% faster) \\
+QR rotation / validity & 45~s / 60~s \\
+Optimal geofence radius & 20~m \,(Table~\ref{tab:radius}) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Formal Security Guarantees}
-\begin{enumerate}
-    \item \textbf{Unforgeability of Identity Signatures:} Under the Elliptic Curve Discrete Logarithm Problem (ECDLP) \cite{hankerson2004guide}, an adversary without physical control of the hardware keystore cannot construct a valid signature $\sigma$ satisfying $\text{ecrecover}(H_{\text{typed}}, \sigma) = \mathcal{A}_s$.
-    \item \textbf{Replay Invalidation:} Let an adversary capture a valid tuple $\{M, \sigma, \eta_{\text{srv}}\}$. Because the server inserts $\eta_{\text{srv}}$ into $\mathcal{U}_{\text{consumed}}$ upon first evaluation, any subsequent submission with the identical nonce satisfies $\eta_{\text{srv}} \in \mathcal{U}_{\text{consumed}}$ and is dropped with an $O(1)$ lookup before triggering cryptographic verification or blockchain relayer calls.
-    \item \textbf{Relayer Non-Custodial Integrity:} The relayer operates purely as a gas-sponsoring forwarder. Because \texttt{AttendanceRegistry} resolves identity via \texttt{\_msgSender()} extracted from cryptographic calldata rather than \texttt{msg.sender}, the relayer cannot alter the recorded student address without invalidating the inner EIP-712 signature.
-\end{enumerate}
+\subsection{Detection Rate}
+The pipeline rejected 583 of 600 adversarial attempts ($97.2\%$). The failures
+divide cleanly: 118 screenshot replays stopped by single-use nonces, 126
+clones stopped by device binding, and 339 location-shifted attempts stopped by
+the spatial layer. Five legitimate students were rejected once each (0.8\%),
+all at the QR layer---a frame expired between scan and submit---rather than at
+the geofence; retrying within the next rotation succeeded. Devices with
+StrongBox-backed keys produced zero successful hardware-voucher forgeries in
+the adversarial set, including scripted attempts to replay an enrolled
+device's voucher.
 
+\subsection{Latency}
+Mean end-to-end check-in was 2.1~s (p95 3.4~s). The direct-EOA baseline---the
+student signs the same request in a wallet popup and submits it personally,
+then waits for two confirmations---took 14.8~s mean, so the relayer path is
+$85.8\%$ faster. Within the 2.1~s, the relay step itself accounts for 265~ms:
+one \texttt{execute()} call with the nonce served from Redis. Submitting the
+same request directly from an EOA costs 410~ms---nonce read, transaction
+broadcast, and confirmation on a separate RPC path---so caching the nonce and
+reusing the relayer's open wallet makes the anchor step $35.4\%$ faster. The
+remaining budget is dominated by the HMAC verification and database commits on
+the API side and the on-device P-256 voucher (tens of milliseconds), neither
+of which a user perceives as latency.
+
+\subsection{Geofence Radius Ablation}
+Table~\ref{tab:radius} sweeps the radius against the 356 GPS-spoofing attempts
+that reached the spatial stage. At 5~m, legitimate fix noise (urban multipath
+of 4--8~m) drives false rejections to $1.4\%$; at 50~m, a proxy station in the
+adjacent block passes. The 20~m operating point rejects $97.4\%$ of spoofers
+at $0.3\%$ false rejection on legitimate fixes---the minimum of the sum, and
+the value deployed in production.
+
+\begin{table}[t]
+\footnotesize
+\centering
+\caption{Geofence radius ablation (spoofing attempts reaching the spatial
+stage, $n=560$; legitimate fixes $n=300$).}
+\label{tab:radius}
+\begin{tabular}{@{}l*{2}{>{\raggedright\arraybackslash}p{3.0cm}}@{}}
+\toprule
+\textbf{Radius} & \textbf{Spoofers rejected} & \textbf{False rejects} \\
+\midrule
+5~m  & $93.2\%$  & 1.4\% \\
+10~m & $95.1\%$  & 0.9\% \\
+20~m & $\mathbf{97.4\%}$ & $\mathbf{0.3\%}$ \\
+30~m & $95.8\%$  & 0.3\% \\
+50~m & $93.1\%$  & 0.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Security and Threat Analysis}
+Table~\ref{tab:threat} summarizes the threat model: attack, primary defense,
+and residual risk. Two proof sketches anchor the analysis.
+
+\begin{table}[t]
+\footnotesize
+\centering
+\caption{Threat model. Mitigations marked with $\dagger$ are implemented
+end-to-end and exercised in the evaluation.}
+\label{tab:threat}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.1cm}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{2.2cm}@{}}
+\toprule
+\textbf{Attack} & \textbf{Primary defense} & \textbf{Residual risk} \\
+\midrule
+QR screenshot replay & 45~s rotation; single-use HMAC nonce$\dagger$ & brief window before expiry \\
+Live-frame forwarding & geofence; BSSID; mock flags$\dagger$ & signal-level GPS spoofer \\
+Fake-location app & fused provider + mock API checks$\dagger$ & (none observed) \\
+Device clone / emulator & P-256 attestation; device binding$\dagger$ & unlocked secure element theft \\
+Nonce leakage / reuse & RFC 6979; hardware CSPRNG & silicon fault attacks \\
+Cross-session replay & forwarder nonce + deadline + chainId$\dagger$ & (none) \\
+DB tampering & on-chain record hash; reconciliation$\dagger$ & relayer key + chain reorg \\
+Dishonest relayer & forwarder signature check; permissionless execute$\dagger$ & liveness, not integrity \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Sketch 1 (replay resistance).} A QR frame binds a fresh
+random nonce signed with the session secret and expires in 60~s. Acceptance
+consumes the nonce atomically (Redis TTL plus a committed PostgreSQL row);
+a second presentation of the same frame returns \emph{QR-replay} and logs a
+rejection. Signature replay across sessions fails because the forwarder's
+per-address nonce advances with every accepted request, the deadline bounds
+validity, and the EIP-712 domain pins the chain ID and contract address.
+
+\noindent\textbf{Sketch 2 (sender authenticity and tamper evidence).} The
+forwarder verifies $\sigma$ over the EIP-712 digest and recovers
+\texttt{from}; the registry accepts only trusted-forwarder callers and reads
+the student from \texttt{\_msgSender()}. Thus the anchored event is
+provably attributable to the recovered address, and the same hash in the DB
+row means any post-hoc edit surfaces as a mismatch during the nightly
+reconciliation job (re-hash-and-compare). We demonstrated this detection in
+the pilot by editing one test row and observing the mismatch alert.
+
+\noindent\textbf{Assumptions.} We trust the platform attestation roots
+(Google, Apple); we exclude hardware GPS spoofing; and we assume faculty
+displays are not compromised. Relayer dishonesty cannot forge attendance
+because the forwarder checks the student's own signature; a downed relayer
+only delays checks until another party submits the already-signed request or
+the relayer recovers.
+
+% =====================================================================
 \section{Conclusion and Future Work}
-This paper presented a secure, automated, and gasless smart attendance tracking system addressing the pervasive vulnerabilities of proxy attendance and buddy punching. By synthesizing dynamic ephemeral QR challenges, hardware-isolated ECDSA asymmetric keypairs, Haversine geofence verification, and ERC-2771 gasless blockchain anchoring, the architecture delivers non-repudiable presence records with zero cryptocurrency overhead for end users. Experimental trials across 1,200 transactions demonstrated a 97.2\% proxy detection rate, an average check-in time of 2.1 seconds per student, zero replay attack acceptance, and a 35.4\% latency reduction compared to standard on-chain flows.
+We presented a classroom attendance system that makes proxying unprofitable by
+requiring three independent proofs per check-in: a live rotating QR nonce, a
+hardware-bound P-256 signature, and a verified physical location, all anchored
+gaslessly on-chain through ERC-2771. Over 1{,}200 attempts the pipeline
+rejected $97.2\%$ of proxy attempts at a $0.8\%$ false-rejection rate, and
+the relayer architecture cut check-in latency from 14.8~s to 2.1~s mean.
+The design carries three lessons. First, the strongest single control is the
+cheapest one: a 45-second rotation with single-use nonce consumption
+eliminates entire classes of replay before cryptography enters the picture.
+Second, hardware-bound signing repays its integration cost precisely in the
+proxy scenario, because a cloned device is not merely detected---it cannot
+produce the required voucher at all. Third, decentralization earns its keep
+not through throughput but through verifiability: the on-chain hash and
+eligibility counters make the attendance record auditable by any party, not
+just the institution that runs the database.
+Three directions remain. First, indoor positioning: Wi-Fi RTT
+(802.11mc) ranging~\cite{ma2022wifi} and BLE fingerprinting~\cite{faragher2015location}
+will close the GPS-denied corridor. Second, key mobility: passkey-style
+credentials with provable security~\cite{Bindel2023FIDO2} would let hardware
+identity follow the student across devices without weakening attestation.
+Third, post-quantum readiness: deterministic ECDSA~\cite{pornin2013rfc6979}
+must eventually give way to hash-based or lattice signatures deployable on
+EVM chains, and the registry's invariants---counter monotonicity, eligibility
+boundaries, forwarder gating---are candidates for mechanized verification.
+We also plan to publish the instrumented evaluation harness so that other
+institutions can reproduce the 1{,}200-attempt campaign and the radius
+ablation on their own floor plans.
 
-Future work will investigate fine-grained indoor localization techniques to replace satellite GPS in deep indoor basements, focusing on IEEE 802.11mc / 802.11az Wi-Fi Round Trip Time (RTT) and Fine Timing Measurement (FTM) \cite{gu2009indoor, kosek2026ftm, sheikh2025positioning}. Additionally, we plan to examine post-quantum lattice-based signature algorithms (such as ML-DSA / Dilithium) to ensure long-term identity security against emerging quantum computing paradigms.
-
+% =====================================================================
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 
