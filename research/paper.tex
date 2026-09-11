@@ -29,19 +29,22 @@
 
 \lstset{
   language=Solidity,
-  basicstyle=\footnotesize\ttfamily,
-  numbers=none,
+  basicstyle=\scriptsize\ttfamily,
+  numbers=left,
   numberstyle=\tiny\color{gray},
   stepnumber=1,
-  numbersep=5pt,
+  numbersep=6pt,
   tabsize=2,
   showspaces=false,
   showstringspaces=false,
   breaklines=true,
   breakatwhitespace=true,
-  frame=single,
-  rulecolor=\color{black!30},
-  backgroundcolor=\color{black!2}
+  frame=lines,
+  rulecolor=\color{black!40},
+  backgroundcolor=\color{black!3},
+  captionpos=b,
+  xleftmargin=12pt,
+  framexleftmargin=10pt
 }
 
 \begin{document}
@@ -181,19 +184,20 @@ Upon scanning $T$ at time $t_{\text{scan}}$, the client constructs the EIP-712 F
 \begin{equation}
     M = \left( \mathcal{A}_s, \mathcal{A}_{\text{target}}, \text{nonce}_{\text{user}}, \text{deadline}, \text{data} \right)
 \end{equation}
-where $\text{data} = \text{abi.encodeWithSignature}(\text{``markAttendance(bytes32,uint256)''}, H_T, t_{\text{scan}})$, with $H_T = \text{keccak256}(T)$.
+where $\text{data} = \mathcal{F}_{\text{abi}}(S,\, H_T,\, t_{\text{scan}})$ is the ABI encoding of the function selector
+$S = \text{``markAttendance(bytes32,uint256)''}$;
+$H_T = \text{keccak256}(T)$ and $\mathcal{A}_{\text{target}}$ is the registry contract address.
 
 The payload hash $H_{\text{typed}}$ is computed in conformance with EIP-712 \cite{eip712}:
 \begin{equation}
-    H_{\text{typed}} = \text{keccak256}\left( \mathtt{0x1901} \mathbin{\Vert} \mathcal{D}_{\text{separator}} \mathbin{\Vert} \text{hashStruct}(M) \right)
+    H_{\text{typed}} = \text{keccak256}\left( \mathtt{0x1901} \mathbin{\Vert} \mathcal{D}_{\text{sep}} \mathbin{\Vert} \text{hashStruct}(M) \right)
 \end{equation}
-where $\mathcal{D}_{\text{separator}}$ is the domain separator binding the request to the specific contract address and blockchain chain ID:
-\begin{align}
-    \mathcal{D}_{\text{separator}} = \text{keccak256}( & \text{keccak256}(\text{``EIP711Domain(string name,string version,''} \nonumber \\
-    & \text{``uint256 chainId,address verifyingContract)''}) \mathbin{\Vert} \nonumber \\
-    & \text{keccak256}(\text{``AttendanceForwarder''}) \mathbin{\Vert} \nonumber \\
-    & \text{keccak256}(\text{``1''}) \mathbin{\Vert} \text{chainId} \mathbin{\Vert} \mathcal{A}_{\text{fwd}} )
-\end{align}
+where the domain separator $\mathcal{D}_{\text{sep}}$ binds the request to the contract address and chain ID:
+\begin{equation}
+\resizebox{0.92\linewidth}{!}{$\displaystyle
+    \mathcal{D}_{\text{sep}} = \text{keccak256}\left( \text{keccak256}(\text{``EIP712Domain(string,string,uint256,address)''}) \mathbin{\Vert} \text{keccak256}(\text{``AttendanceForwarder''}) \mathbin{\Vert} \text{keccak256}(\text{``1''}) \mathbin{\Vert} \text{chainId} \mathbin{\Vert} \mathcal{A}_{\text{fwd}} \right)
+$}
+\end{equation}
 
 The mobile secure element signs $H_{\text{typed}}$ using ECDSA \cite{johnson2001ecdsa, pornin2013rfc6979}:
 \begin{enumerate}
@@ -240,7 +244,9 @@ To eliminate the proxy attack vector where a single device carries credentials f
 
 The fingerprint $D_{\text{fp}}$ is computed as:
 \begin{equation}
+\resizebox{0.92\linewidth}{!}{$\displaystyle
     D_{\text{fp}} = \text{HMAC-SHA256}\left( K_{\text{app}}, \text{HardwareSerial} \mathbin{\Vert} \text{CPU\_ABI} \mathbin{\Vert} \text{KeystoreRootID} \right)
+$}
 \end{equation}
 If a check-in request arrives from a known hardware fingerprint associated with a different student, or if the client operating system reports an active mock-location provider or rooted kernel environment (via Android Key Attestation \cite{google2023keystore} or iOS DeviceCheck \cite{apple2022secureenclave}), the request is rejected and flagged for administrative review.
 
@@ -257,13 +263,16 @@ Under ERC-2771:
     \item The forwarder recovers the signer address, asserts the forwarder nonce, and invokes \texttt{AttendanceRegistry.markAttendance()} via low-level call, appending the 20-byte recovered student address $\mathcal{A}_s$ to the end of \texttt{msg.data}.
     \item \texttt{AttendanceRegistry} inherits from OpenZeppelin \texttt{ERC2771Context} \cite{openzeppelin2024}. Instead of reading \texttt{msg.sender} (which evaluates to the relayer address), it extracts the original student address using \texttt{\_msgSender()}:
     \begin{equation}
+\resizebox{0.9\linewidth}{!}{$\displaystyle
         \mathtt{\_msgSender()} = \text{address}\left(\mathtt{msg.data[\text{length}-20..\text{length}]}\right)
+$}
     \end{equation}
 \end{enumerate}
 
 \subsection{Smart Contract Architecture}
-Listing~\ref{lst:registry} presents the core implementation of the \texttt{AttendanceRegistry} contract.
+Listing~\ref{lst:registry} presents the core implementation of the \texttt{AttendanceRegistry} contract, illustrating the native meta-transaction extraction mechanics.
 
+\begin{figure*}[!t]
 \begin{lstlisting}[caption={ERC-2771 Compliant Attendance Registry Contract.}, label={lst:registry}]
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
@@ -279,9 +288,8 @@ contract AttendanceRegistry is ERC2771Context {
         bool verified;
     }
 
-    // studentAddress => sessionId => AttendanceRecord
-    mapping(address => mapping(bytes32 => AttendanceRecord)) 
-        public records;
+    // Mapping: studentAddress => sessionId => AttendanceRecord
+    mapping(address => mapping(bytes32 => AttendanceRecord)) public records;
 
     event AttendanceMarked(
         address indexed student,
@@ -295,13 +303,10 @@ contract AttendanceRegistry is ERC2771Context {
         admin = msg.sender;
     }
 
-    function markAttendance(
-        bytes32 sessionHash, 
-        uint256 timestamp
-    ) external {
+    function markAttendance(bytes32 sessionHash, uint256 timestamp) external {
+        // Recovers authentic student address via calldata suffix from forwarder
         address student = _msgSender();
-        require(!records[student][sessionHash].verified, 
-            "Attendance already recorded");
+        require(!records[student][sessionHash].verified, "Attendance already recorded");
         
         records[student][sessionHash] = AttendanceRecord({
             sessionHash: sessionHash,
@@ -312,14 +317,13 @@ contract AttendanceRegistry is ERC2771Context {
         emit AttendanceMarked(student, sessionHash, timestamp);
     }
 
-    function verifyAttendance(
-        address student, 
-        bytes32 sessionHash
-    ) external view returns (bool) {
+    function verifyAttendance(address student, bytes32 sessionHash) external view returns (bool) {
         return records[student][sessionHash].verified;
     }
 }
 \end{lstlisting}
+\vspace{-1em}
+\end{figure*}
 
 \section{Implementation Details}
 The system was realized as a production-grade monorepo organized into decoupled micro-services and clients:
@@ -346,6 +350,7 @@ We simulated active attack vectors:
 \caption{Security Attack Mitigation and Detection Rates ($N=1{,}200$ trials)}
 \label{tab:security_eval}
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lccc}
 \toprule
 \textbf{Attack Vector} & \textbf{Trials} & \textbf{Intercepted} & \textbf{Success Rate} \\
@@ -358,7 +363,7 @@ Valid Check-in (Legitimate)    & 200 & 194 & 97.0\% \\
 \midrule
 \textbf{Overall Proxy Detection} & \textbf{1,000} & \textbf{997} & \textbf{97.2\% (Avg)} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 As documented in Table~\ref{tab:security_eval}, dynamic QR token refreshment reduced screenshot forwarding success to 0.0\%. Server-side nonce tracking eliminated signature replay attacks completely (reducing replay acceptance from a baseline 12.6\% in non-nonce configurations down to 0.0\%). Mock-location detection intercepted 98.5\% of GPS spoofing attempts, resulting in an empirical proxy detection rate of 97.2\%.
@@ -370,6 +375,7 @@ We benchmarked end-to-end execution latency across distinct system stages, compa
 \caption{Latency Breakdown by Execution Phase (in Milliseconds)}
 \label{tab:latency}
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{lcc}
 \toprule
 \textbf{Execution Phase} & \textbf{Proposed (ERC-2771)} & \textbf{Direct EOA On-Chain} \\
@@ -384,7 +390,7 @@ Mempool Inclusion \& Mine     & Async / Queued    & $12{,}400 \pm 3{,}200$\,ms \
 \midrule
 \textbf{Client Observed Total}& \textbf{2.1\,s (Avg Total)} & \textbf{14.8\,s (Avg Total)} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 As shown in Table~\ref{tab:latency}, by shifting on-chain block mining to an asynchronous background relay queue, the client-observed end-to-end confirmation latency dropped from 14.8 seconds to 2.1 seconds on average. The off-chain relayer verification pipeline completed in 265\,ms compared to 410\,ms for unoptimized validation scripts, representing a 35.4\% reduction in processing latency.
@@ -396,6 +402,7 @@ We evaluated false rejection rates (FRR) and false acceptance rates (FAR) across
 \caption{Geofence Radius Trade-Off Analysis ($N=400$ check-ins)}
 \label{tab:geofence}
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tabular}{cccc}
 \toprule
 \textbf{Radius ($d_{\max}$)} & \textbf{FRR (In-Room)} & \textbf{FAR (Outside Hall)} & \textbf{GPS Spoof Rate} \\
@@ -406,7 +413,7 @@ We evaluated false rejection rates (FRR) and false acceptance rates (FAR) across
 30\,m  & 0.2\%  & 8.4\%  & 3.8\% \\
 50\,m  & 0.0\%  & 24.6\% & 9.2\% \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}
 
 Table~\ref{tab:geofence} demonstrates that $d_{\max} = 20$\,m represents the optimal operating point for standard educational buildings, balancing a low in-room false rejection rate of 1.8\% with an acceptable outside false acceptance rate of 2.1\% and a low 1.4\% GPS spoof leakage rate.
@@ -418,7 +425,8 @@ We formalize our threat analysis using the taxonomy established by Burrows et al
 \caption{Threat Model and Mitigation Matrix}
 \label{tab:threat_matrix}
 \centering
-\begin{tabular}{p{2.2cm}p{2.6cm}p{3.0cm}}
+\small
+\begin{tabular}{p{2.0cm}p{2.4cm}p{3.0cm}}
 \toprule
 \textbf{Threat Vector} & \textbf{Vulnerability Source} & \textbf{System Mitigation} \\
 \midrule
