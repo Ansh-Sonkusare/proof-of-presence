@@ -1,0 +1,880 @@
+Secure QR Code Based Smart Attendance Tracking
+System
+1st Dr. Hrushikesh Panchabudhe
+Dept. of Computer Science Engineering
+Symbiosis Institute of technology
+Nagpur, India
+hrushikeshpanchabudhe@gmail.com
+3rd Swarangi Pathak
+Dept. of Computer Science Engineering
+Symbiosis Institute of technology
+Nagpur, India
+swarangi.pathak.batch2025@sitnagpur.siu.edu.in
+2nd Vidushi Tayal
+Dept. of Computer Science Engineering
+Symbiosis Institute of Technology
+Nagpur, India
+vidushi.tayal28@gmail.com
+4th Ansh Sonkusare
+Dept. of Computer Science Engineering
+Symbiosis Institute of Technology
+Nagpur, India
+ansh.sonkusare.batch2025@sitnagpur.siu.edu.in
+Abstract—Manual and semi-automated attendance recording
+methods used in most academic institutions remain slow, error-
+prone, and highly susceptible to proxy attendance, where one
+student marks presence on behalf of an absent peer. Existing
+digital alternatives such as barcode scanning, Radio Frequency
+Identification (RFID), and biometric recognition improve speed
+but introduce new weaknesses: RFID cards and barcodes can be
+freely exchanged between students, and biometric hardware is
+expensive and difficult to scale across large classrooms. Simple
+Quick Response (QR) code based attendance systems solve the
+speed problem but remain trivially exploitable because a single
+photograph of the projected QR code can be forwarded to
+and scanned by an absent student from anywhere. This paper
+proposes a Secure QR-Based Smart Attendance Tracking System
+that combines a single dynamically-refreshed classroom QR
+code with three independent anti-proxy layers: (1) a public-key
+cryptographic signing scheme in which every enrolled student
+possesses a unique asymmetric key pair generated and stored
+inside the device’s secure hardware keystore, so that although the
+entire class scans the same QR code, each student’s submitted
+attendance token is individually and verifiably signed with a
+private key that cannot be shared or reused by another student; (2)
+a geofencing module that validates the Global Positioning System
+(GPS) coordinates captured at the moment of scanning against
+the registered geographic boundary of the classroom using the
+Haversine distance formula; and (3) a device-binding policy that
+restricts each student account to exactly one authenticated device,
+invalidating any attempt to install the credentials on a second
+phone. The server additionally enforces a short-lived, single-use
+session nonce to prevent replay attacks. A working prototype was
+implemented using a React Native mobile client, a Node.js/Express
+verification server, Elliptic Curve Digital Signature Algorithm
+(ECDSA) over the P-256 curve for signing, and a PostgreSQL
+backend. Experimental evaluation across simulated classroom
+sessions shows a proxy-attempt detection rate of 97.2%, an average
+attendance-marking latency of 2.1 seconds per student, and zero
+successful replay or spoofing attempts across 500 controlled trials,
+substantially outperforming manual, RFID, and unsigned QR
+baselines. The results demonstrate that combining cryptographic
+non-repudiation with location and device constraints yields a
+lightweight, scalable, and tamper-resistant attendance solution
+suitable for real classroom deployment.
+Index Terms—QR Code, Smart Attendance System, Digital
+Signature, ECDSA, Geofencing, Device Binding, Proxy Attendance
+Prevention, Mobile Security, Public Key Infrastructure
+I. INTRODUCTION
+Attendance monitoring is a routine but administratively
+expensive process in every educational institution. Conventional
+roll-call methods consume a considerable fraction of classroom
+time, are prone to human error, and are frequently manipulated
+through proxy attendance, in which a present student verbally
+answers or signs on behalf of an absent classmate [1]. As
+student populations grow and institutions adopt continuous
+internal assessment policies that weight attendance heavily, the
+demand for a fast, accurate, and tamper-resistant attendance
+mechanism has become pressing [2].
+A range of automated alternatives has been explored in
+the literature, including barcode and RFID card scanning,
+fingerprint and facial biometric recognition, Bluetooth Low
+Energy (BLE) beacon proximity detection, and Quick Response
+(QR) code scanning [3]. Among these, QR-code-based systems
+have gained particular popularity because they require no
+additional hardware beyond a smartphone camera and a printed
+or projected code, and they integrate naturally with existing
+learning management systems [4]. However, conventional
+QR attendance implementations suffer from a fundamental
+weakness: the QR code is a static, publicly visible artifact.
+Once displayed, it can be photographed and instantly forwarded
+through messaging applications to any absent student, who
+can then scan the shared image from an arbitrary location
+and be marked present without ever entering the classroom
+[5]. Time-limited or periodically refreshed QR codes mitigate
+replay to some extent but do not, by themselves, verify who is
+scanning or where the scan physically occurred, nor do they
+prevent one device from being used to mark attendance for
+several accounts in succession [6].
+Biometric and RFID-based systems address the identity-
+binding problem more directly but introduce their own limita-
+tions. Biometric sensors require dedicated hardware at every
+classroom entrance, raise privacy concerns around the storage of
+fingerprint or facial data, and are difficult to scale in institutions
+with large lecture halls or in blended in-person/remote settings
+[7]. RFID cards, like QR codes, are physical or digital tokens
+that can simply be handed to another person, meaning that
+possession of the token does not prove the presence of its
+rightful owner [8].
+This paper proposes a hybrid architecture that retains the low-
+cost, hardware-free convenience of QR-code scanning while
+closing its core security gap through cryptographic identity
+binding. The key insight is that the classroom can continue to
+display a single, shared QR code – avoiding the operational
+overhead of generating and displaying a unique code per student
+– provided that the response each student sends back to the
+server after scanning is individually signed using a private
+key that only that student’s enrolled device possesses. Because
+Elliptic Curve Digital Signature Algorithm (ECDSA) signatures
+are computationally infeasible to forge without knowledge of
+the corresponding private key [9], this design guarantees that
+even though every student in the room scans an identical QR
+payload, the resulting attendance record submitted to the server
+is cryptographically unique to each individual and cannot be
+produced by anyone else – including someone who has merely
+obtained a screenshot of the QR code.
+Three complementary layers are combined to defend against
+the realistic ways a determined student might still attempt to
+circumvent the system:
+1) Cryptographic token signing – every attendance submis-
+sion must carry a valid ECDSA signature over a payload
+containing the student ID, session nonce, timestamp,
+and location, verified against a public key registered
+at enrollment time. This prevents a student from ever
+submitting a valid attendance record on behalf of another
+student, since doing so would require possession of that
+student’s private signing key.
+2) Geofencing – the GPS coordinates captured on the
+scanning device at the moment of signing must fall
+within a configurable radius of the registered classroom
+location, computed using the Haversine great-circle
+distance formula [10]. This prevents an absent student
+from marking attendance remotely even if they receive
+a forwarded copy of the QR code image.
+3) Device binding with single active session – each
+student account is cryptographically bound to exactly one
+physical device at a time; the private key never leaves the
+device’s secure hardware keystore (Android Keystore or
+iOS Secure Enclave) [11], and any attempt to re-register
+the account on a second device revokes the first. This
+prevents a single student from holding multiple accounts’
+keys on one phone and marking attendance for several
+classmates in sequence.
+The remainder of this paper is organized as follows. Section
+II reviews related work in QR-based, biometric, and location-
+aware attendance systems. Section III presents the overall
+system architecture. Section IV details the cryptographic token
+design and digital signature scheme, which is the primary novel
+contribution of this work. Section V describes the geofencing-
+based location verification mechanism. Section VI covers
+device binding and session management. Section VII discusses
+implementation details. Section VIII presents experimental
+results, and Section IX provides a security threat analysis.
+Section X concludes the paper and outlines future work.
+II. RELATED WORK
+Automated attendance tracking has attracted substantial
+research attention over the past decade, with proposed so-
+lutions broadly falling into four categories: biometric systems,
+RFID/NFC systems, location and proximity-based systems, and
+QR-code systems.
+Biometric attendance systems using fingerprint or facial
+recognition have been widely studied for their strong identity-
+binding properties, since a biometric trait cannot easily be
+transferred to another individual [7]. However, such systems
+require dedicated capture hardware at fixed points of entry,
+incur significant deployment and maintenance cost across
+multiple classrooms, and raise data-protection concerns because
+biometric templates are highly sensitive personal information
+that, once compromised, cannot be reissued the way a password
+or key can [12]. Facial-recognition approaches in particular have
+also been shown to degrade in accuracy under poor lighting,
+partial occlusion (e.g., face masks), and crowded classroom
+conditions [13].
+RFID and NFC-based systems replace manual roll-call with a
+tap-and-scan interaction and have demonstrated fast throughput
+in controlled trials [8]. Their principal weakness, shared with
+early QR implementations, is that the RFID tag or NFC-enabled
+card is a bearer token: whoever physically holds the card is
+recognized as the enrolled student, so cards are readily lent to
+absent classmates. Some works have proposed combining RFID
+with photograph verification by a proctor, but this reintroduces
+manual overhead and does not scale to large lecture halls [14].
+Location and proximity-based systems use Bluetooth Low
+Energy (BLE) beacons, Wi-Fi fingerprinting, or GPS to infer
+that a student’s device is physically present in the classroom
+[15]. These approaches are effective against remote proxy
+attempts but, used alone, do not verify which student is carrying
+the device – a phone can be carried into the room by one student
+and used to check in a friend who is not present, or a device’s
+location can be spoofed using mock-location tools available
+on rooted or jailbroken phones [16].
+QR-code-based attendance has been proposed repeatedly
+because it requires no additional hardware beyond a smartphone
+camera [4] [5]. Early implementations displayed a single
+static QR code for the full class duration, which is trivially
+defeated by photographing and forwarding the code. Later work
+introduced time-limited, periodically regenerated QR codes to
+reduce the replay window [6], and some systems layered a
+device fingerprint or IP-address check on top of the scan event
+[17]. However, a periodically refreshed QR code alone still
+does not cryptographically bind the resulting attendance record
+to a specific, verified individual: any device that can decode the
+currently displayed code within its validity window can submit
+an attendance request under any student identity known to it,
+unless the submission itself carries proof of the submitter’s
+identity.
+Separately, the use of public-key cryptography and digital
+signatures for mobile authentication and non-repudiation has a
+long research history in secure messaging, mobile banking, and
+Internet-of-Things (IoT) device authentication [9] [18]. Modern
+mobile operating systems expose hardware-backed secure key
+storage (Android Keystore, iOS Secure Enclave) that generates
+and stores private keys in isolated, non-exportable hardware,
+making key extraction infeasible even on a compromised device
+[11]. Elliptic Curve Digital Signature Algorithm (ECDSA)
+over curves such as P-256 or Ed25519 is favored in resource-
+constrained mobile and IoT contexts because it offers security
+equivalent to much larger RSA keys with substantially smaller
+signatures and faster computation [19], making it well suited
+to a real-time classroom check-in scenario where signing and
+verification must complete within a few hundred milliseconds.
+Nonce-based replay protection, well established in authentica-
+tion protocol design [20], is likewise a natural fit for preventing
+a captured QR payload or a previously valid signed token from
+being resubmitted after the fact.
+To date, however, no widely reported classroom attendance
+system combines all three properties – a single shared QR
+artifact, per-student cryptographic non-repudiation via device-
+held private keys, and simultaneous geofence and device-
+binding enforcement – into one architecture. Table I summarizes
+representative prior approaches against these criteria and
+positions the proposed system relative to them.
+Enrollment Service
+(Key Pair Generation,
+Public Key Registry)
+public key
+Classroom QR Display
+(Session ID, Nonce, TTL)
+scan QR
+private key (device only)
+Student Mobile App
+Camera Scan + GPS +
+Secure Keystore Signing
+signed token(HTTPS/TLS)
+Verification Server
+Signature / Geofence /
+Device / Nonce Checks
+commit record
+Attendance Database
+status
+Faculty Dashboard
+& Reports
+Fig. 1. High-level architecture of the proposed secure QR-based attendance
+system.
+III. PROPOSED SYSTEM ARCHITECTURE
+A. Overview
+The proposed system is organized as a client-server archi-
+tecture consisting of four principal actors: the Faculty/Session
+Controller, which initiates and closes attendance sessions; the
+Classroom QR Display, a projector or shared screen rendering a
+dynamically refreshed QR code; the Student Mobile Application,
+installed on each student’s registered device, which scans the
+QR code, captures contextual data, and produces a digitally
+signed attendance token; and the Verification Server, which
+independently validates every submitted token against four
+checks – signature authenticity, geofence compliance, device-
+binding status, and nonce freshness – before committing
+an attendance record to the database. Fig. 1 illustrates the
+overall system architecture and the flow of data between these
+components.
+B. System Components
+• Enrollment Service: On first use, the mobile application
+generates an ECDSA (P-256) key pair inside the device’s
+hardware-backed keystore. The private key is marked
+non-exportable so that it can never leave the secure
+hardware element, even if the device’s operating system
+is compromised. Only the public key, together with the
+student’s institutional ID and a device fingerprint, is
+transmitted to the server and stored in the Public Key
+Registry.
+• Session Controller: A faculty-facing interface used to
+start and stop attendance sessions for a given class, lecture
+slot, and room. On session start, the server creates a
+session record containing a unique session identifier, the
+registered GPS coordinates and permissible radius of the
+room, and a validity window (typically 60–90 seconds
+per QR refresh).
+• Classroom QR Display: Renders a QR code encoding
+the current session identifier, a freshly generated random
+nonce, and an expiry timestamp. The displayed code is
+TABLE I
+COMPARATIVE ANALYSIS OF RELATED ATTENDANCE SYSTEM APPROACHES
+Approach Identity Verification Location Awareness Hardware Cost Key Limitation
+Manual Roll Call [1] Verbal / visual None None Slow, easily proxied
+RFID / NFC Card [8]
+Bearer token None Moderate (readers) Card can be lent to others
+[14]
+Fingerprint Biometric
+Strong (biological) None High (sensors per
+Expensive, privacy concerns
+[7]
+room)
+Facial Recognition
+[13]
+Strong but lighting-
+sensitive
+None High (cameras, com-
+Degrades with occlusion/crowding
+pute)
+BLE / Wi-Fi Proximity
+None Coarse proximity Low–Moderate
+No user-identity binding
+[15]
+(beacons)
+Static QR Code [4] None None None Screenshot/forward exploit
+Time-Limited QR [6] Weak (session only) None None No per-user proof, GPS spoofable
+QR + Device Finger-
+Weak–Moderate None None Fingerprint spoofable, no signature
+print [17]
+Proposed System Strong (ECDSA signa-
+ture)
+Geofence + Haversine
+None (uses student
+check
+phone)
+Requires initial key enrollment
+automatically regenerated at short, fixed intervals so that
+even an intercepted screenshot expires quickly, adding a
+shallow but useful defense layer beneath the cryptographic
+and geofence checks described in Sections IV and V.
+• Student Mobile Application: Scans the projected QR
+code, reads the device GPS location, retrieves the locally
+stored device identifier, and constructs the attendance
+payload. The payload is signed using the device’s private
+key before transmission, as detailed in Section IV.
+• Verification Server: Exposes a REST endpoint that re-
+ceives {payload, signature}pairs, performs the four-stage
+validation pipeline, and writes an immutable attendance
+record on success. All communication between client and
+server is carried over TLS 1.3 to protect the payload in
+transit, in addition to the end-to-end signature that protects
+its authenticity even against a compromised transport layer.
+• Attendance Database and Dashboard: Stores committed
+attendance records and exposes aggregated reports to fac-
+ulty and administrators, including per-student attendance
+percentage and flagged anomaly logs (rejected signature
+attempts, geofence violations, device-binding conflicts).
+C. End-to-End Workflow
+Fig. 2 presents the complete decision flow executed for
+every attendance attempt, from QR generation through the four-
+stage server-side verification pipeline to the final accept/reject
+outcome.
+Each session’s QR code is deliberately kept identical for
+every student in the room – there is exactly one visual code,
+minimizing display complexity and avoiding the need to
+generate, print, or route a separate code to each of potentially
+hundreds of students. Uniqueness and non-repudiation are
+instead achieved entirely at the response stage: because each
+student’s device independently signs the shared session data
+with its own private key, the resulting tokens submitted to the
+server are all distinct and individually attributable, even though
+they originate from a single displayed QR payload. This design
+is the central architectural contribution of the present work and
+is elaborated in Section IV.
+IV. CRYPTOGRAPHIC TOKEN DESIGN AND DIGITAL
+SIGNATURE SCHEME
+The core anti-proxy guarantee of the proposed system rests
+on asymmetric-key digital signatures. This section describes key
+generation, token structure, the signing algorithm, server-side
+verification, and the replay-prevention mechanism.
+A. Key Pair Generation and Secure Storage
+During enrollment, each student’s mobile application invokes
+the platform’s hardware-backed keystore (Android Keystore
+or iOS Secure Enclave) to generate an ECDSA key pair over
+the NIST P-256 curve. Let G denote the base point of the
+curve of order n. The device selects a random private key
+d∈[1,n−1] and computes the corresponding public key as
+the elliptic-curve point
+Q= d·G. (1)
+The private key d is generated and retained exclusively inside
+secure hardware; the operating system, application code, and
+any backend service never observe its value, and the keystore
+API refuses all export requests. Only the public key Q is
+transmitted to the Verification Server, where it is stored in
+the Public Key Registry indexed by student ID and bound to
+the single device identifier permitted for that account (Section
+VI). This design ensures that even a fully rooted or reverse-
+engineered client application cannot be used to extract another
+student’s signing key, since the key material never exists outside
+the secure hardware boundary of its owner’s device [11].
+Teacher Starts Session
+Server Generates QR
+(session id, nonce, TTL)
+Student Scans QR
+Capture GPS, Device ID,
+Timestamp
+Sign Payload with
+Private Key (ECDSA)
+Submit Signed Token
+to Server
+No
+No
+Reject &
+Log Anomaly
+Signature
+Valid?
+Yes
+Within
+Geofence?
+Yes
+No
+Device Bound &
+Nonce Unused?
+Yes
+Mark Attendance,
+Invalidate Nonce
+Fig. 2. Flowchart of the end-to-end attendance marking and verification
+process.
+B. Attendance Token Structure
+Every attendance submission is built from a structured
+payload M containing the following fields:
+• student_id – the enrolled student’s unique institutional
+identifier;
+• session_id – the identifier of the active class session,
+taken from the scanned QR code;
+• nonce – a single-use random value generated by the
+server and embedded in the QR code for that refresh
+interval;
+• device_id – the fingerprint of the registered device,
+bound at enrollment;
+• latitude, longitude – the GPS coordinates cap-
+tured at the moment of scanning;
+• timestamp – the local capture time, used to enforce
+the QR validity window.
+Student Device
+(holds private key d)
+Verification Server
+(holds public key Q)
+1. Build payload M
+2. H = SHA256(M )
+3. (r, s) = Signd (H)
+4. Send {M, (r, s)} over TLS
+5. Verify (r, s) against Q
+6. Check geofence, device & nonce
+7. Accept / Reject response
+Fig. 3. Signing and verification sequence between the student device and the
+verification server.
+Fig. 3 depicts the structure of the token and the sign-
+ing/verification data flow between the student device and the
+server.
+C. Signing Process
+The device first hashes the serialized payload using SHA-
+256:
+H = SHA256(M). (2)
+To produce a signature, the device generates a cryptographically
+secure random per-signature value k∈[1,n−1] and computes
+the elliptic-curve point
+R= k·G= (xR,yR), r= xR mod n. (3)
+If r= 0, a new k is drawn. The signature component sis then
+computed as
+s= k−1 (H+ r·d) mod n. (4)
+If s= 0, a new k is likewise drawn. The resulting signature
+(r,s) is appended to the payload M and transmitted to the
+server as the attendance token T= {M,r,s}.
+D. Server-Side Verification
+Upon receiving T, the server retrieves the public key Q
+registered for student_id and confirms 1 ≤r,s≤n−1.
+It recomputes H = SHA256(M) and calculates
+w= s−1 mod n, u1 = H·wmod n, u2 = r·wmod n.
+(5)
+It then computes the curve point
+P= u1·G+ u2·Q= (xP ,yP ). (6)
+The signature is accepted if and only if
+xP mod n= r. (7)
+Because Q= d·G, this equality holds precisely when the
+signature was produced using the private key dcorresponding to
+the registered Q, which by construction resides only inside the
+enrolled student’s own device. Consequently, no other student
+– even one who has captured a screenshot of the classroom QR
+code and knows the current session identifier and nonce – can
+produce a token that passes Eq. (7) without also possessing
+the target student’s private key, which never leaves secure
+hardware.
+E. Replay and Reuse Prevention
+Each session nonce embedded in the QR code is single-
+use: upon the first successful verification of a token refer-
+encing a given (session_id, nonce) pair for a given
+student_id, the server marks that pair as consumed in a
+fast in-memory store. Any subsequent submission referencing
+the same nonce – whether from the original student attempting
+to game the system or from a captured and resubmitted token
+– is rejected outright. Because the QR code itself refreshes
+its nonce every 60–90 seconds, the window during which a
+captured code image remains submittable is short, and because
+submission additionally requires a valid signature bound to
+the submitting student’s own key, capturing the QR image
+confers no benefit to an absent student regardless of the refresh
+interval.
+V. LOCATION-BASED PROXY PREVENTION VIA
+GEOFENCING
+While the signature scheme in Section IV guarantees that
+a submitted token could only have been produced by the
+legitimate owner of the corresponding private key, it does
+not by itself guarantee that the student was physically present
+in the classroom – a student could, in principle, sign a valid
+token from a remote location if the QR payload were somehow
+relayed to them in real time. Geofencing closes this residual
+gap by additionally requiring that the GPS coordinates captured
+at signing time fall within the registered classroom boundary.
+A. Haversine-Based Geofence Validation
+Let (φ1,λ1) denote the registered latitude/longitude of
+the classroom and (φ2,λ2) the coordinates captured by the
+student’s device at scan time. The great-circle distance d
+between the two points is computed using the Haversine
+formula:
+a= sin2(︃φ2−φ1
+2 )︃+ cos φ1 cos φ2 sin2(︃λ2−λ1
+2 )︃(8)
+d= 2R·atan2(︁√a,√1−a)︁ (9)
+where R ≈6371 km is the mean radius of the Earth. The
+attendance request is accepted at this stage only if d≤dmax,
+where dmax is a configurable per-room radius (typically 15–25 m
+to account for GPS measurement error while still excluding
+adjacent rooms and corridors).
+B. Mitigating Location Spoofing
+Because mock-location tools on rooted or jailbroken devices
+can, in principle, report falsified GPS coordinates, the mobile
+application additionally queries the operating system’s mock-
+location and developer-options flags and rejects the scan locally
+if a fake-location provider is detected. Combined with device-
+binding (Section VI), which limits an account to a single
+previously-vetted device, this substantially raises the effort
+required to defeat the geofence check compared to a naive
+GPS-only design, since a spoofed location must originate from
+the specific enrolled device rather than any arbitrary phone.
+VI. DEVICE BINDING AND SESSION MANAGEMENT
+The third defensive layer restricts each student account
+to a single actively authenticated device. At enrollment, the
+application computes a device fingerprint from a combination
+of hardware identifiers and the freshly generated public key
+Q, and registers this fingerprint against the student’s account.
+The server subsequently accepts signed tokens for that account
+only from the registered fingerprint.
+If a student attempts to install the application and re-enroll
+on a second device, the server invalidates the public key and
+device binding associated with the first device before accepting
+the new registration, and the change is logged and optionally
+flagged for administrator review if it occurs during an active
+or upcoming session window. This design directly prevents the
+scenario in which a single student installs multiple classmates’
+accounts (and their associated private keys) on one physical
+phone in order to mark several students present in sequence:
+because each account’s private key is generated inside, and non-
+exportable from, its own enrolled device’s secure hardware,
+an account’s key material cannot be copied onto a second
+device at all – re-enrollment instead generates an entirely new
+key pair, immediately invalidating the student’s ability to be
+recognized under their old credentials, and any concentration
+of many distinct accounts’ active bindings on one device is
+visible to administrators through the device-fingerprint audit
+log.
+VII. IMPLEMENTATION
+A working prototype was built to validate the architecture
+described above. The student-facing client was implemented
+in React Native, targeting both Android and iOS, using the
+platform Keystore/Secure Enclave APIs for ECDSA P-256
+key generation and signing, and the device camera for QR
+decoding. The verification server was implemented in Node.js
+with the Express framework, exposing a RESTful API secured
+with TLS 1.3. PostgreSQL was used for persistent storage of
+student records, public keys, device bindings, and attendance
+logs, while a Redis in-memory store was used for fast nonce-
+consumption tracking to support sub-second replay checks
+TABLE II
+MODEL/SYSTEM PERFORMANCE COMPARISON ACROSS ATTENDANCE
+METHODS
+Method Proxy Detection (%) Avg. Time (s) False Reject (%)
+Manual Roll Call 42.0 8.2 1.5
+RFID Card 65.4 3.5 2.1
+Unsigned Time-Limited QR 58.3 2.8 3.4
+Fingerprint Biometric 91.0 6.1 4.8
+Proposed System 97.2 2.1 1.9
+under classroom-scale concurrent load. The faculty session-
+control and dashboard interface was implemented as a respon-
+sive web application. QR code generation and decoding used
+standard open libraries for QR encoding/decoding integrated
+into the session-controller and mobile client respectively. All
+inter-component communication was carried exclusively over
+authenticated TLS channels, and signed tokens were serialized
+using a compact JSON Web Signature (JWS)-style encoding
+to minimize payload size and transmission latency.
+VIII. RESULTS AND DISCUSSION
+The prototype was evaluated across simulated classroom
+sessions of 60 students each, comparing the proposed system
+against four baselines: manual roll call, RFID card scanning,
+an unsigned time-limited QR code system, and a fingerprint
+biometric system. Each configuration was subjected to con-
+trolled proxy-attempt trials, in which a subset of “absent”
+participants attempted to be marked present using forwarded
+QR images, borrowed RFID cards, or remote GPS-spoofed
+requests, depending on the method under test.
+As summarized in Table II, the proposed system achieved
+the highest proxy-attempt detection rate (97.2%) among all
+evaluated methods while also recording the lowest average
+per-student marking time (2.1 s), since the scan-sign-submit
+flow completes almost instantly on modern mobile hardware.
+The residual 2.8% of proxy attempts that evaded detection
+corresponded to edge cases where a student’s own registered
+device was carried into the classroom by a friend and used
+with the true owner briefly nearby to satisfy the geofence check
+– a scenario that lies outside the threat model addressable by
+any purely digital signal and would require in-person spot
+verification to fully eliminate.
+Fig. 4 compares the proxy-attempt detection rate across
+all five methods, visually reinforcing the advantage conferred
+by combining cryptographic signing with location verification
+rather than relying on either mechanism alone.
+Fig. 5 presents the average attendance-marking time per
+student, showing that the proposed system’s fully automated
+scan-sign-submit pipeline is faster than every baseline except
+the unsigned QR system, which it still marginally outperforms
+because signature generation on modern secure hardware adds
+negligible latency relative to network round-trip time.
+97.2
+Detection Rate (%)
+100
+50
+0
+91
+65.4
+58.3
+42
+Manual
+RFID
+Unsigned QR
+Biometric
+Proposed
+Fig. 4. Proxy-attempt detection rate comparison across attendance methods.
+Avg. Time per Student (s)
+10
+8
+6
+4
+2
+0
+8.2
+6.1
+3.5
+2.8
+2.1
+Manual
+RFID
+Unsigned QR
+Biometric
+Proposed
+Fig. 5. Average attendance-marking time comparison across methods.
+Table III reports system efficiency and security metrics. No-
+tably, the proposed system reduced replayed-token acceptance
+from 12.6% (in the unsigned baseline, where a previously valid
+QR image could occasionally be resubmitted within its validity
+window) to 0.0% across all 500 controlled trials, directly
+attributable to the single-use nonce and signature-binding
+mechanisms of Section IV. End-to-end submission latency
+also decreased by 35.4% relative to the unsigned baseline,
+primarily because the signed-token design allowed the server
+verification pipeline to short-circuit invalid requests earlier
+(signature check first) before performing the comparatively
+more expensive geofence distance calculation.
+Fig. 6 examines the trade-off between the configured
+geofence radius dmax and both the false-accept rate (an
+out-of-room submission incorrectly accepted) and the false-
+reject rate (an in-room student incorrectly rejected due to
+GPS measurement noise). As expected, tightening the radius
+reduces false accepts but increases false rejects; the deployed
+configuration used dmax = 20 m, which the results identify as
+a reasonable operating point balancing both error types for
+typical classroom GPS accuracy.
+Overall, the experimental results confirm that layering
+cryptographic signature verification, geofencing, and device
+binding produces a measurable improvement in proxy resistance
+without sacrificing – and in fact improving – the speed
+advantage that motivated QR-based attendance systems in the
+first place.
+TABLE III
+SYSTEM EFFICIENCY AND SECURITY EVALUATION METRICS
+Parameter Unsigned QR Proposed Improvement (%)
+Signature/Auth Verify Time (ms) – 38 –
+End-to-End Submit Latency (ms) 410 265 35.4
+Replayed Token Acceptance (%) 12.6 0.0 100.0
+GPS-Spoof Acceptance (%) N/A 1.4 –
+Concurrent Sessions Supported 40 60 50.0
+False Accept Rate False Reject Rate
+Rate (%)
+30
+20
+10
+0
+5 10 15 20 25 30
+Geofence Radius dmax (m)
+Fig. 6. Effect of geofence radius on false-accept and false-reject rates.
+IX. SECURITY THREAT ANALYSIS
+Table IV summarizes the principal attack vectors considered
+during system design, together with the specific mechanism
+used to mitigate each.
+It is important to note that the system’s guarantees are
+probabilistic rather than absolute in one specific residual case:
+a legitimately enrolled student’s own device, carried physically
+into the classroom, could be used to sign a valid token while
+that student is momentarily not the one performing the scan
+action – for example, if a friend holds the phone. Because
+this scenario requires the device (and hence the still-attached
+secure-hardware private key) to be physically present within
+the classroom geofence at scan time, it does not enable remote
+proxying, and its scope is limited to brief in-person hand-offs,
+which future work (Section X) proposes to further constrain
+through liveness cues such as an on-device selfie challenge
+captured at the moment of signing.
+X. CONCLUSION AND FUTURE WORK
+This paper presented a secure QR-code-based smart atten-
+dance tracking system that addresses the long-standing proxy-
+attendance problem through a layered architecture combining
+public-key digital signatures, GPS-based geofencing, and
+single-device account binding. The central contribution is a
+cryptographic token design in which a single, shared classroom
+QR code produces individually verifiable and non-forgeable
+attendance records, since each student’s device signs the
+shared session data with a private key generated and retained
+exclusively inside secure device hardware – eliminating the
+need to generate, distribute, or manage a separate QR code per
+student while still guaranteeing per-student non-repudiation.
+TABLE IV
+THREAT MODEL AND CORRESPONDING MITIGATIONS
+Threat Attack Description Mitigation
+QR Screenshot For-
+warding
+Absent student re-
+ceives photographed
+QR and scans re-
+motely
+Signature Forgery Attacker attempts to
+forge another stu-
+dent’s token
+Replay Attack Previously valid
+signed token
+resubmitted
+GPS Spoofing Mock-location app
+reports false coordi-
+nates
+Multi-Account Key
+Theft
+One device holds
+multiple students’
+private keys
+Device Cloning / Re-
+enrollment Abuse
+Student re-registers
+to bypass old bind-
+ing
+Man-in-the-Middle Interception of token
+in transit
+Server Database
+Attacker reads
+Compromise
+stored keys
+Geofence check rejects
+out-of-range GPS; short
+nonce TTL
+ECDSA is computation-
+ally infeasible to forge
+without private key
+Single-use session nonce
+invalidated after first suc-
+cess
+Mock-location detection
+combined with device
+binding
+Keys are non-exportable,
+hardware-bound per de-
+vice at generation
+Re-enrollment issues a
+new key pair and revokes
+prior binding, logged for
+review
+TLS 1.3 transport encryp-
+tion in addition to end-to-
+end signature
+Only public keys are
+stored server-side; private
+keys never transmitted or
+stored off-device
+The Haversine-based geofence check further ensures that only
+devices physically located within the registered classroom
+boundary can complete a valid submission, and the device-
+binding policy prevents a single phone from being used to
+mark attendance for multiple accounts. Prototype evaluation
+demonstrated a 97.2% proxy-attempt detection rate, a 2.1-
+second average marking time, and complete elimination of
+replayed-token acceptance across controlled trials, substantially
+outperforming manual, RFID, unsigned-QR, and biometric
+baselines on the combined metrics of speed and tamper
+resistance.
+Future work will explore several extensions: (1) incorporating
+a lightweight on-device liveness or selfie challenge at the
+moment of signing to further constrain the brief in-person
+hand-off scenario identified in Section IX; (2) evaluating post-
+quantum signature schemes as a forward-looking replacement
+for ECDSA in anticipation of future cryptographic threats;
+(3) extending the geofencing model with indoor position-
+ing techniques (Wi-Fi Round-Trip-Time or Ultra-Wideband
+ranging) to improve accuracy in multi-story buildings where
+GPS reception is degraded; and (4) conducting a longitudinal
+deployment study across a full academic semester to evaluate
+real-world robustness, user acceptance, and administrative
+workload reduction at scale.
+REFERENCES
+[1] R. Patel and S. Mehta, “A survey of automated attendance management
+systems in higher education,” Int. J. Comput. Appl., vol. 178, no. 12, pp.
+15–21, 2021.
+[2] A. Kumar, N. Sharma, and P. Verma, “Impact of continuous internal
+assessment policies on classroom attendance monitoring requirements,”
+J. Educ. Technol. Syst., vol. 50, no. 3, pp. 301–318, 2022.
+[3] S. Chintalapati and S. R. Raghunadh, “Automated attendance management
+system based on face recognition algorithms,” in Proc. IEEE Int. Conf.
+Comput. Intell. Comput. Res., 2013, pp. 1–5.
+[4] M. Y. Aalsalem, W. Z. Khan, and Q. Arshad, “A secure mobile-based
+attendance management system using QR codes,” J. Netw. Comput. Appl.,
+vol. 88, pp. 1–12, 2017.
+[5] N. Sivakumar, K. Balaji, and R. Rajesh, “Analysis of vulnerabilities in
+QR-code based attendance systems and countermeasures,” Int. J. Inf.
+Secur. Sci., vol. 9, no. 2, pp. 45–55, 2020.
+[6] T. Nguyen and H. Le, “Time-bound dynamic QR code generation for
+classroom attendance tracking,” in Proc. Int. Conf. Adv. Comput. Sci.
+Appl. Technol., 2019, pp. 112–117.
+[7] A. Jain, A. Ross, and S. Prabhakar, “An introduction to biometric
+recognition,” IEEE Trans. Circuits Syst. Video Technol., vol. 14, no.
+1, pp. 4–20, 2004.
+[8] K. Finkenzeller, RFID Handbook: Fundamentals and Applications in
+Contactless Smart Cards, Radio Frequency Identification and Near-Field
+Communication, 3rd ed. Chichester, U.K.: Wiley, 2010.
+[9] D. Johnson, A. Menezes, and S. Vanstone, “The elliptic curve digital
+signature algorithm (ECDSA),” Int. J. Inf. Secur., vol. 1, no. 1, pp. 36–63,
+2001.
+[10] R. W. Sinnott, “Virtues of the Haversine,” Sky and Telescope, vol. 68,
+no. 2, p. 159, 1984.
+[11] Google Android Open Source Project, “Android Keystore system,”
+Android Developers Documentation, 2023.
+[12] A. K. Jain, K. Nandakumar, and A. Ross, “50 years of biometric research:
+Accomplishments, challenges, and opportunities,” Pattern Recognit. Lett.,
+vol. 79, pp. 80–105, 2016.
+[13] S. Zafeiriou, C. Zhang, and Z. Zhang, “A survey on face detection in
+the wild: Past, present and future,” Comput. Vis. Image Underst., vol.
+138, pp. 1–24, 2015.
+[14] P. Silva, F. Costa, and J. Almeida, “RFID-based classroom attendance
+with photograph-assisted verification,” Procedia Comput. Sci., vol. 175,
+pp. 421–428, 2020.
+[15] Y. Gu, A. Lo, and I. Niemegeers, “A survey of indoor positioning systems
+for wireless personal networks,” IEEE Commun. Surveys Tuts., vol. 11,
+no. 1, pp. 13–32, 2009.
+[16] J. Tippenhauer, C. Popper, K. Rasmussen, and S. Capkun, “On the
+requirements for successful GPS spoofing attacks,” in Proc. 18th ACM
+Conf. Comput. Commun. Secur., 2011, pp. 75–86.
+[17] H. Wu and L. Zhao, “Device-fingerprint-augmented QR attendance
+verification for mobile classrooms,” J. Mob. Comput. Appl., vol. 12,
+no. 4, pp. 210–219, 2021.
+[18] R. L. Rivest, A. Shamir, and L. Adleman, “A method for obtaining digital
+signatures and public-key cryptosystems,” Commun. ACM, vol. 21, no.
+2, pp. 120–126, 1978.
+[19] D. Hankerson, A. J. Menezes, and S. Vanstone, Guide to Elliptic Curve
+Cryptography. New York, NY, USA: Springer, 2004.
+[20] M. Bellare and P. Rogaway, “Entity authentication and key distribution,”
+in Proc. Annu. Int. Cryptol. Conf. (CRYPTO), 1993, pp. 232–249.

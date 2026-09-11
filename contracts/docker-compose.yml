@@ -1,0 +1,25 @@
+services:
+  hardhat-node:
+    build:
+      context: .
+    container_name: hardhat-node
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./artifacts:/app/artifacts
+    command: npx hardhat node --hostname 0.0.0.0
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: pbl-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: attendance_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - pbl-pgdata:/var/lib/postgresql/data
+
+volumes:
+  pbl-pgdata:

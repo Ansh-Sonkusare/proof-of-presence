@@ -1,0 +1,20 @@
+{
+  "name": "pbl-attendance-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Blockchain-based student attendance tracker with QR codes",
+  "workspaces": [
+    "packages/shared",
+    "contracts",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "compile": "npm run compile --workspace=contracts",
+    "test:contracts": "npm run test --workspace=contracts",
+    "deploy:amoy": "npm run deploy:amoy --workspace=contracts",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

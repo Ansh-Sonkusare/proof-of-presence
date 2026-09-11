@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String           @id @default(uuid()) @db.Uuid
+  role              String           @db.Text
+  name              String           @db.Text
+  email             String           @unique @db.Text
+  password          String           @db.Text
+  walletAddress     String?          @unique @map("wallet_address") @db.Text
+  enrolledDeviceId  String?          @map("enrolled_device_id") @db.Text
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  courses           Course[]         @relation("FacultyCourses")
+  attendanceRecords AttendanceRecord[]
+  rebindRequests    DeviceRebindRequest[] @relation("StudentRebinds")
+  approvedRebinds   DeviceRebindRequest[] @relation("AdminRebinds")
+
+  @@map("users")
+}
+
+model Course {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.Text
+  facultyId        String   @map("faculty_id") @db.Uuid
+  minAttendancePct Int      @default(75) @map("min_attendance_pct")
+
+  faculty          User     @relation("FacultyCourses", fields: [facultyId], references: [id])
+  sessions         Session[]
+
+  @@map("courses")
+}
+
+model Session {
+  id                  String    @id @default(uuid()) @db.Uuid
+  courseId             String    @map("course_id") @db.Uuid
+  startedAt           DateTime  @map("started_at") @db.Timestamptz()
+  endedAt             DateTime? @map("ended_at") @db.Timestamptz()
+  classroomLat        Float?    @map("classroom_lat") @db.DoublePrecision
+  classroomLon        Float?    @map("classroom_lon") @db.DoublePrecision
+  geofenceRadiusM     Int       @default(100) @map("geofence_radius_m")
+  classroomWifiBssid  String?   @map("classroom_wifi_bssid") @db.Text
+
+  course              Course    @relation(fields: [courseId], references: [id])
+  qrRotations         QrRotation[]
+  attendanceRecords   AttendanceRecord[]
+
+  @@map("sessions")
+}
+
+model QrRotation {
+  id        String   @id @default(uuid()) @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  nonce     String   @db.Text
+  issuedAt  DateTime @map("issued_at") @db.Timestamptz()
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+
+  session   Session  @relation(fields: [sessionId], references: [id])
+
+  @@map("qr_rotations")
+}
+
+model AttendanceRecord {
+  id              String    @id @default(uuid()) @db.Uuid
+  sessionId       String    @map("session_id") @db.Uuid
+  studentId       String    @map("student_id") @db.Uuid
+  timestamp       DateTime  @default(now()) @db.Timestamptz()
+  recordHash      String    @map("record_hash") @db.Text
+  txHash          String?   @map("tx_hash") @db.Text
+  syncedOnchain   Boolean   @default(false) @map("synced_onchain")
+  deviceId        String    @map("device_id") @db.Text
+  gpsLat          Float?    @map("gps_lat") @db.DoublePrecision
+  gpsLon          Float?    @map("gps_lon") @db.DoublePrecision
+  wifiBssid       String?   @map("wifi_bssid") @db.Text
+  rejectionReason String?   @map("rejection_reason") @db.Text
+
+  session         Session   @relation(fields: [sessionId], references: [id])
+  student         User      @relation(fields: [studentId], references: [id])
+
+  @@map("attendance_records")
+}
+
+model DeviceRebindRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  studentId   String    @map("student_id") @db.Uuid
+  oldDeviceId String?   @map("old_device_id") @db.Text
+  newDeviceId String    @map("new_device_id") @db.Text
+  status      String    @default("pending") @db.Text
+  approvedBy  String?   @map("approved_by") @db.Uuid
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  student     User      @relation("StudentRebinds", fields: [studentId], references: [id])
+  admin       User?     @relation("AdminRebinds", fields: [approvedBy], references: [id])
+
+  @@map("device_rebind_requests")
+}
