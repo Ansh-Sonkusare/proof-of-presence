@@ -1,4 +1,4 @@
-# PBL Attendance Tracker
+# Proof of Presence
 
 Blockchain-based student attendance system with rotating QR codes, anti-proxy checks (device binding + geofence/WiFi), and gasless on-chain anchoring via ERC-2771 meta-transactions.
 
@@ -59,18 +59,18 @@ Login as one of the seeded users (see `backend/prisma/seed.ts`). API docs are au
 
 ---
 
-## Current Build Status
+## Project Status
 
-### ✅ Smart Contracts (`contracts/`)
+### Smart Contracts (`contracts/`)
 - `AttendanceRegistry.sol` — marks attendance (forwarder-gated), stores per-student attended counts + session record hashes, emits eligibility events.
 - `Forwarder.sol` — stock OZ `ERC2771Forwarder` shim enabling gasless meta-transactions.
 - Full deploy script, 8 passing tests (relay happy path, direct-call rejection, wrong signer, expired deadline, replay), and a demo script covering tamper detection + gas logging.
 - Deployed to **local Hardhat node only**; Polygon Amoy is configured but unexercised.
 
-### ✅ Shared Package (`packages/shared`)
+### Shared Package (`packages/shared`)
 - Complete: all domain schemas (User, Course, Session, AttendanceRecord, QrPayload, ForwardRequest/EIP-712 types) and the full 15-endpoint typed `HttpApi` contract with tagged errors, consumed by both sides.
 
-### ✅ Backend (`backend`)
+### Backend (`backend`)
 - JWT auth (login/me), bcrypt passwords, role middleware.
 - Student onboarding: wallet binding + device enrollment.
 - Faculty: session lifecycle (create/end), rotating QR payloads (45s rotation / 60s expiry, nonce replay protection), live scan feed.
@@ -80,14 +80,14 @@ Login as one of the seeded users (see `backend/prisma/seed.ts`). API docs are au
 - Admin: list/create users, device-rebind approval, per-course attendance report with eligibility %.
 - 6-table Prisma schema (users, courses, sessions, qr_rotations, attendance_records, device_rebind_requests).
 
-### ✅ Frontend (`frontend`)
+### Frontend (`frontend`)
 - Login page with JWT storage + role-based route guards.
 - **Student portal:** wallet generation/onboarding, device enrollment, paste-QR flow → geolocation capture → sign EIP-712 → gasless mark (shows tx hash / rejection reason).
 - **Faculty portal:** start/end sessions, rotating QR display (30s poll), live scan feed table.
 - **Admin portal:** user stats, create-user form, all-users table.
 - Fully type-safe API client generated from the shared `HttpApi`.
 
-### ⚠️ Known Gaps / Not Yet Built
+### Known Gaps
 - **Contracts:** `AttendanceStats.total` is never incremented ("Step 8" pending) → on-chain percentage/eligibility always reads 0/false; reports currently come purely from the database.
 - **Frontend:** no real camera QR scanning (paste-input only); QR shown as raw JSON text, not rendered image; admin rebind-approval UI missing; attendance history and course report pages missing; course management absent (faculty picks course IDs free-text).
 - **Backend gaps:** admin user creation uses a placeholder password hash (no password set); no endpoint for students to *request* device rebinding; blockchain read methods unused; relay failures silently swallowed (no retry queue); faculty/student endpoints don't verify roles (only admin does); CORS fully open; no rate limiting; no backend tests.
