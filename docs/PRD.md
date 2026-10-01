@@ -35,7 +35,8 @@ Rotating QR alone only defeats **time-shifted** proxy attendance (screenshot-and
 | Check | What it verifies | Defeats |
 |---|---|---|
 | **Rotating QR** (30–60s) | Scan happened during a live session window | Screenshot-and-use-later |
-| **Geofencing / WiFi SSID check** | Device is physically near the classroom (GPS radius match, or connected to the classroom's registered WiFi SSID/BSSID) | Scanning from home / off-campus |
+| **WiFi BSSID check** | Device is connected to the classroom's specific access point | Same-campus forwarding (student in adjacent room/building) |
+| **Geofencing (GPS)** | Device is within the classroom's GPS radius — fallback only when BSSID is not configured | Off-campus entirely |
 | **Device binding** | Scan came from the student's own enrolled device (device fingerprint/ID registered at signup) | Forwarding the QR to a friend's phone to scan on the student's behalf |
 
 **Enrollment:** at signup, each student's device is fingerprinted (a stable device ID, e.g. installation ID + hardware attributes) and bound to their account. Re-binding to a new device requires an admin-approved reset (phone lost/changed).
@@ -49,7 +50,11 @@ Rotating QR alone only defeats **time-shifted** proxy attendance (screenshot-and
 
 **Enumerated rejection reasons:** the frontend and backend share a fixed set of rejection codes: `device_mismatch`, `out_of_range`, `qr_expired`, `qr_replay`, `signature_invalid`, `session_ended`, `relay_failed`.
 
-**Known limitations:** GPS/WiFi spoofing and device fingerprint cloning are theoretically possible on rooted/jailbroken devices, but this is an accepted low-priority tradeoff for this project's scope — the bar is already far higher than "just forward a screenshot," which covers the realistic threat model for a university PBL deployment. Not treating this as a blocker for design or implementation.
+**Known limitations:**
+
+- **GPS/WiFi spoofing and device fingerprint cloning** are theoretically possible on rooted/jailbroken devices — accepted low-priority tradeoff for this project's scope.
+- **BSSID is a deployment requirement for classroom-level precision in dense buildings.** The system targets ~20 m GPS precision (A-GPS / assisted positioning). This is sufficient to separate classrooms whose centers are >40 m apart (standalone buildings, outdoor venues, labs with clear sky visibility). It is **not** sufficient to distinguish adjacent rooms in a standard corridor-style university block — a typical classroom is 10–15 m wide, so the 20 m error circle spans into the next room. In those deployments the location guarantee degrades from "in this classroom" to "in this part of the building." QR rotation (45 s window) adds a marginal time constraint but does not close the adjacency gap. **Deployment recommendation:** configure `classroom_wifi_bssid` for sessions in multi-room buildings. GPS-only (`classroom_wifi_bssid` left blank) is acceptable for standalone labs, outdoor venues, or any venue where classrooms are physically separated by more than ~40 m.
+- The bar is already far higher than "just forward a screenshot," which covers the realistic threat model for a university PBL deployment. Not treating GPS-only deployments as a blocker for implementation.
 
 **Rate limiting [PRD extension]:** the backend enforces per-student rate limits on attendance submission attempts (e.g. max 1 attempt per QR rotation window per student per session). This prevents contract spam and abort-flood attacks.
 
