@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getUser } from "@/lib/auth.js";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getApiClient } from "@/api/client.js";
 import {
   Wallet,
@@ -10,11 +10,73 @@ import {
   CheckCircle,
   X,
   History,
+  Camera,
 } from "lucide-react";
 
 export const Route = createFileRoute("/student/")({
   component: StudentDashboard,
 });
+
+function CameraScanner({ onScan }: { onScan: (data: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [err, setErr] = useState("");
+  const supported = "BarcodeDetector" in window;
+
+  useEffect(() => {
+    if (!supported) return;
+    let stream: MediaStream | null = null;
+    let active = true;
+    // ponytail: BarcodeDetector is Chromium-only; text fallback below handles other browsers
+    const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: "environment" } })
+      .then((s) => {
+        if (!active || !videoRef.current) { s.getTracks().forEach(t => t.stop()); return; }
+        stream = s;
+        videoRef.current.srcObject = s;
+        return videoRef.current.play();
+      })
+      .then(function poll(): Promise<void> | void {
+        if (!active || !videoRef.current) return;
+        return detector.detect(videoRef.current).then((codes: Array<{ rawValue: string }>) => {
+          if (!active) return;
+          if (codes.length > 0) {
+            active = false;
+            stream?.getTracks().forEach(t => t.stop());
+            onScan(codes[0].rawValue);
+          } else {
+            return new Promise<void>(r => setTimeout(r, 300)).then(poll);
+          }
+        });
+      })
+      .catch((e: Error) => setErr(e?.message || "Camera unavailable"));
+
+    return () => {
+      active = false;
+      stream?.getTracks().forEach(t => t.stop());
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!supported) return null;
+
+  return (
+    <div className="relative rounded-lg overflow-hidden bg-black aspect-video">
+      {err ? (
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <p className="text-sm text-red-400 text-center">{err}</p>
+        </div>
+      ) : (
+        <>
+          <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-48 h-48 border-2 border-white/60 rounded-lg" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const FORWARD_REQUEST_TYPES = {
   ForwardRequest: [
@@ -408,32 +470,38 @@ function StudentDashboard() {
         </div>
 
         {scanMode ? (
-          <div className="space-y-4">
-            <div className="bg-gray-100 rounded-lg p-8 text-center">
-              <QrCode className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600 mb-4">
-                Point your camera at the QR code displayed by the faculty
+          <div className="space-y-3">
+            <CameraScanner onScan={handleScanQr} />
+            {"BarcodeDetector" in window ? (
+              <p className="text-xs text-center text-gray-500">
+                Hold the QR code up to your camera — it will scan automatically
               </p>
+            ) : (
+              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800">
+                Camera scanning requires Chrome or Edge. Use the text box below.
+              </div>
+            )}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <Camera className="h-4 w-4 text-gray-400" />
+              </div>
               <input
                 type="text"
-                placeholder="Paste QR data or scan result here..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                placeholder="Or paste QR JSON here and press Enter…"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleScanQr((e.target as HTMLInputElement).value);
                   }
                 }}
-                autoFocus
               />
-              <div className="flex gap-2 mt-4 justify-center">
-                <button
-                  onClick={() => setScanMode(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
+            <button
+              onClick={() => setScanMode(false)}
+              className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-md"
+            >
+              Cancel
+            </button>
           </div>
         ) : (
           <div>
