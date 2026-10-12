@@ -15,47 +15,40 @@ Blockchain-based student attendance system with rotating QR codes, anti-proxy ch
 
 ## Quick Start
 
-Prerequisites: **Node.js 22+**, **npm**, a local **PostgreSQL**, and Docker (optional, for the chain node).
+Prerequisites: **Node.js 22+**, **npm**, **Docker**, and a **Chromium browser** (Chrome/Edge for camera QR scanning).
 
 ```bash
-# 1. Install all workspaces
-npm install
-
-# 2. Start a local Hardhat chain node (or use docker compose up from contracts/)
-cd contracts && npx hardhat node &
-
-# 3. Deploy contracts (note the printed addresses)
-cd contracts && npm run deploy:local
-
-# 4. Configure backend env
-cp backend/.env.example backend/.env
-#   - set ATTENDANCE_REGISTRY_ADDRESS and MINIMAL_FORWARDER_ADDRESS
-#     to the addresses printed by step 3
-#   - adjust DATABASE_URL if your Postgres differs
-#   .env.example ships with Hardhat's default funded key for dev only
-
-# 5. Create schema + seed data
-cd backend && npm run db:push && npm run db:seed
-
-# 6. Run backend (http://localhost:3001)
-npm run dev:backend        # from repo root
-
-# 7. Run frontend (in another terminal; http://localhost:5173)
-npm run dev:frontend       # from repo root
+# One-command start
+./run-dev.sh
 ```
 
-Login as one of the seeded users (see `backend/prisma/seed.ts`). API docs are auto-served by Swagger on the backend.
+This starts everything: Hardhat chain, contracts, Postgres DB, backend (:3001), and frontend (:3000).
+
+**Manual setup** (if needed):
+```bash
+npm install
+cd contracts && npx hardhat node &
+cd contracts && npm run deploy:local
+cp backend/.env.example backend/.env  # update ATTENDANCE_REGISTRY_ADDRESS and MINIMAL_FORWARDER_ADDRESS
+cd backend && npm run db:push && npm run db:seed
+npm run dev:backend   # terminal 1
+npm run dev:frontend  # terminal 2
+```
+
+Login as one of the seeded users (see `backend/prisma/seed.ts`). Frontend: http://localhost:3000. API docs: http://localhost:3001/docs.
 
 ## Other Useful Commands
 
 | Command (repo root unless noted) | What it does |
 |---|---|
+| `./run-dev.sh` | Start everything (Hardhat, contracts, DB, backend, frontend) |
+| `node scripts/e2e.mjs` | E2E test: logins, onboarding, device checks, geofence, relay, replay protection, live feed, history |
 | `npm run compile` | Compile Solidity contracts |
 | `npm run test:contracts` | Run Hardhat contract tests (8 cases) |
 | `npm run deploy:amoy` | Deploy contracts to Polygon Amoy testnet |
 | `npm run typecheck` | Typecheck every workspace |
 | `npm run db:studio` (in `backend/`) | Prisma DB GUI |
-| `npx hardhat run scripts/demo.js --network localhost` (in `contracts/`) | End-to-end demo: signing, relay, tamper detection, replay protection, gas costs |
+| `npx hardhat run scripts/demo.js --network localhost` (in `contracts/`) | Tamper detection & gas cost demo |
 
 ---
 
@@ -82,17 +75,26 @@ Login as one of the seeded users (see `backend/prisma/seed.ts`). API docs are au
 
 ### Frontend (`frontend`)
 - Login page with JWT storage + role-based route guards.
-- **Student portal:** wallet generation/onboarding, device enrollment, paste-QR flow → geolocation capture → sign EIP-712 → gasless mark (shows tx hash / rejection reason).
-- **Faculty portal:** start/end sessions, rotating QR display (30s poll), live scan feed table.
-- **Admin portal:** user stats, create-user form, all-users table.
+- **Student portal:** wallet generation/onboarding, device enrollment, camera QR scanning (BarcodeDetector + paste fallback) → geolocation capture → sign EIP-712 → gasless mark (shows tx hash / rejection reason) → attendance history.
+- **Faculty portal:** start/end sessions, select course from dropdown, rotating QR display (45s rotation, 60s expiry), live scan feed table.
+- **Admin portal:** user stats, create-user form, all-users table, device-rebind approval UI (shows old device), course attendance reports.
 - Fully type-safe API client generated from the shared `HttpApi`.
 
-### Known Gaps
-- **Contracts:** `AttendanceStats.total` is never incremented ("Step 8" pending) → on-chain percentage/eligibility always reads 0/false; reports currently come purely from the database.
-- **Frontend:** no real camera QR scanning (paste-input only); QR shown as raw JSON text, not rendered image; admin rebind-approval UI missing; attendance history and course report pages missing; course management absent (faculty picks course IDs free-text).
-- **Backend gaps:** admin user creation uses a placeholder password hash (no password set); no endpoint for students to *request* device rebinding; blockchain read methods unused; relay failures silently swallowed (no retry queue); faculty/student endpoints don't verify roles (only admin does); CORS fully open; no rate limiting; no backend tests.
-- **Security notes (dev-grade):** student wallet private keys stored in localStorage; `.env.example` contains Hardhat's default private key — never use in production; JWT secret has a hardcoded dev fallback.
-- **Docs drift:** `docs/plan.md` still says everything is "not started" although most of the build order is implemented; PRD extensions (WebSocket live feed, retry queue, rate limiting, HMAC server-side verification) remain pending.
+### Recently Fixed
+✓ Role + ownership checks on attendance/student endpoints  
+✓ Relay retry (3 attempts) with error logging  
+✓ CORS restricted via `CORS_ORIGINS` env  
+✓ Per-user rate limit on attendance endpoints  
+✓ Faculty course dropdown (GET `/api/faculty/courses`)  
+✓ Admin rebind shows old device, stable per-browser device id  
+
+### Known Gaps & Open Issues
+- **QR HMAC signing** (#10) — QR payloads carry an `hmac` field but it is not generated or verified server-side  
+- **WebSocket live feed** (#11) — faculty QR refresh still polls (30s); real-time via WebSocket pending  
+- **Contracts:** on-chain eligibility checking not wired to frontend (percentage read from DB only)  
+- **Backend:** no unit tests beyond e2e  
+- **Security (dev-grade):** wallet private keys in localStorage; `.env.example` has Hardhat's default key (never production); JWT secret has hardcoded fallback  
+- **Deployment:** Polygon Amoy deploy unexercised (Hardhat testnet only)
 
 ## Documentation
 

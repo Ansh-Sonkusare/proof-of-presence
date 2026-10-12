@@ -10,6 +10,7 @@ export const Route = createFileRoute("/faculty/")({
 
 function FacultyDashboard() {
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [courses, setCourses] = useState<{ id: string; name: string }[]>([]);
   const [activeSession, setActiveSession] = useState<any>(null);
   const [qrPayload, setQrPayload] = useState<any>(null);
   const [liveScans, setLiveScans] = useState<any[]>([]);
@@ -77,6 +78,16 @@ function FacultyDashboard() {
       setLiveScans(scans);
     } catch {}
   };
+
+  useEffect(() => {
+    getApiClient()
+      .then((c) => c.faculty.listCourses())
+      .then((cs) => {
+        setCourses([...cs]);
+        setSelectedCourseId((cur) => cur || cs[0]?.id || "");
+      })
+      .catch((err: any) => setError(err?.message || "Failed to load courses"));
+  }, []);
 
   useEffect(() => {
     if (!activeSession) return;
@@ -183,15 +194,19 @@ function FacultyDashboard() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Course ID
+                Course
               </label>
-              <input
-                type="text"
+              <select
                 value={selectedCourseId}
                 onChange={(e) => setSelectedCourseId(e.target.value)}
-                placeholder="e.g. course-pbl-01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-              />
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               onClick={handleCreateSession}

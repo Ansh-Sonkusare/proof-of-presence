@@ -27,7 +27,13 @@ const ApiLive = HttpApiBuilder.api(AttendanceApi).pipe(
 const port = parseInt(process.env.PORT || "3001", 10);
 
 const program = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
-  Layer.provide(HttpApiBuilder.middlewareCors()),
+  Layer.provide(HttpApiBuilder.middlewareCors({
+    allowedOrigins: (
+      process.env.CORS_ORIGINS || "http://localhost:3000,http://localhost:5173"
+    )
+      .split(",")
+      .map((o) => o.trim()),
+  })),
   Layer.provide(HttpApiSwagger.layer()),
   Layer.provide(ApiLive),
   HttpServer.withLogAddress,

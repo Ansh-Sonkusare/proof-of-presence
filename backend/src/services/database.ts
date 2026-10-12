@@ -127,13 +127,6 @@ export class Database extends Effect.Service<Database>()("Database", {
               },
             })
           ),
-
-        findUsed: (sessionId: string, nonce: string) =>
-          tryQuery(
-            prisma.qrRotation.findFirst({
-              where: { sessionId, nonce },
-            })
-          ),
       },
 
       attendanceRecord: {
@@ -204,7 +197,7 @@ export class Database extends Effect.Service<Database>()("Database", {
           tryQuery(
             prisma.deviceRebindRequest.findMany({
               where: { status: "pending" },
-              include: { student: { select: { name: true, email: true } } },
+              include: { student: { select: { name: true, email: true, enrolledDeviceId: true } } },
               orderBy: { createdAt: "asc" },
             })
           ),

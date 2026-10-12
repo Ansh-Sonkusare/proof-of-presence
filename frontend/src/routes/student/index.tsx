@@ -90,6 +90,18 @@ const FORWARD_REQUEST_TYPES = {
   ],
 };
 
+function getInstallationId(): string {
+  try {
+    const stored = localStorage.getItem("pop.installationId");
+    if (stored) return stored;
+    const id = crypto.randomUUID();
+    localStorage.setItem("pop.installationId", id);
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 function StudentDashboard() {
   const user = getUser()!;
   const [walletAddress, setWalletAddress] = useState(user.walletAddress);
@@ -158,7 +170,7 @@ function StudentDashboard() {
     setError("");
     setSuccess("");
     try {
-      const deviceId = `device-${user.id}-${Date.now()}`;
+      const deviceId = `device-${getInstallationId()}`;
       const client = await getApiClient();
       await client.students.onboardDevice({
         payload: { deviceId },
@@ -177,7 +189,7 @@ function StudentDashboard() {
     setError("");
     setSuccess("");
     try {
-      const newDeviceId = `device-${user.id}-${Date.now()}`;
+      const newDeviceId = `device-${getInstallationId()}`;
       const client = await getApiClient();
       await client.students.requestRebind({
         payload: { newDeviceId },
@@ -235,7 +247,7 @@ function StudentDashboard() {
         payload: {
           sessionId,
           nonce,
-          deviceId: enrolledDevice || "",
+          deviceId: `device-${getInstallationId()}`,
           gpsLat,
           gpsLon,
         },

@@ -15,6 +15,10 @@
     "deploy:amoy": "npm run deploy:amoy --workspace=contracts",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "overrides": {
+    "vite": "^8.0.0"
   }
 }

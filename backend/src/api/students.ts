@@ -14,13 +14,22 @@ const catchDb = <A>(effect: Effect.Effect<A, any, any>) =>
     )
   );
 
-const requireStudent = Effect.gen(function* () {
+export const requireStudent = Effect.gen(function* () {
   const currentUser = yield* CurrentUser;
   if (currentUser.role !== "student") {
     return yield* new Unauthorized({ message: "Student access required" });
   }
   return currentUser;
 });
+
+// Students may only read their own data; faculty/admin may read any.
+export const requireSelfOrStaff = (studentId: string) =>
+  Effect.gen(function* () {
+    const currentUser = yield* CurrentUser;
+    if (currentUser.role === "student" && currentUser.id !== studentId) {
+      return yield* new Unauthorized({ message: "Cannot access another student's data" });
+    }
+  });
 
 export const StudentGroupLive = HttpApiBuilder.group(
   AttendanceApi,
@@ -85,6 +94,7 @@ export const StudentGroupLive = HttpApiBuilder.group(
       .handle("getStudentCourses", ({ path }) =>
         catchDb(
           Effect.gen(function* () {
+            yield* requireSelfOrStaff(path.studentId);
             const db = yield* Database;
 
             // Courses a student is known to attend are derived from their

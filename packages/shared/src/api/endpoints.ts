@@ -106,6 +106,11 @@ const CreateSessionPayload = Schema.Struct({
 
 export const FacultyGroup = HttpApiGroup.make("faculty")
   .add(
+    HttpApiEndpoint.get("listCourses", "/faculty/courses")
+      .addSuccess(Schema.Array(Course))
+      .addError(BadRequest)
+  )
+  .add(
     HttpApiEndpoint.post("createSession", "/faculty/sessions")
       .setPayload(CreateSessionPayload)
       .addSuccess(Session)

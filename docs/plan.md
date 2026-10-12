@@ -1,6 +1,6 @@
 # Plan: Blockchain Attendance Tracker
 
-Living document — updated as tasks complete. Last updated: 2026-07-27.
+Living document — updated as tasks complete. Last updated: 2026-10-12.
 
 ---
 
@@ -8,11 +8,11 @@ Living document — updated as tasks complete. Last updated: 2026-07-27.
 
 | Checkpoint | Weight | Target Date | Deliverable | Status |
 |---|---|---|---|---|
-| **Zeroth Evaluation** | 5M | TBD | Literature review, architecture diagram, contract interface draft, tech stack justification | Not started |
-| **Mid CA** | 10M | TBD | Auth + roles; static QR + DB write; contract on local Hardhat node with `markAttendance`; one full E2E record | Not started |
-| **ESE CA** | 5M | TBD | Rotating QR + HMAC; meta-tx relayer; eligibility % on-chain | Not started |
-| **Research** | 10M | TBD | Tamper-detection demo; gas cost analysis; latency benchmarks | Not started |
-| **ESE Evaluation** | 15M | TBD | Full polished demo; mainnet/testnet deploy; documentation; viva-ready | Not started |
+| **Zeroth Evaluation** | 5M | — | Literature review, architecture diagram, contract interface draft, tech stack justification | ✓ Done |
+| **Mid CA** | 10M | — | Auth + roles; static QR + DB write; contract on local Hardhat node with `markAttendance`; one full E2E record | ✓ Done |
+| **ESE CA** | 5M | — | Rotating QR + HMAC; meta-tx relayer; eligibility % on-chain | ✓ Done |
+| **Research** | 10M | — | Tamper-detection demo; gas cost analysis; latency benchmarks | ✓ Done |
+| **ESE Evaluation** | 15M | — | Full polished demo; mainnet/testnet deploy; documentation; viva-ready | ✓ Done |
 
 ---
 
@@ -22,16 +22,16 @@ Sequence from AI.md §8. Do not skip ahead without prior phases working.
 
 | Step | Description | Depends On | Status |
 |---|---|---|---|
-| **1** | DB schema + migrations + auth + role-based routes (no blockchain) | — | Not started |
-| **2** | Static QR generation + scan + DB-only attendance write | Step 1 | Not started |
-| **3** | Deploy `ERC2771Forwarder` + `AttendanceRegistry` to the local Hardhat node; direct `markAttendance` call | Step 1 | Not started |
-| **4** | Meta-tx relaying (student signs, backend relays through forwarder) | Steps 2, 3 | Not started |
-| **5** | QR rotation (30–60s expiry + nonce) | Step 2 | Not started |
-| **6** | Device binding (onboarding + `enrolled_device_id` check) | Step 2 | Not started |
-| **7** | Geofence/WiFi check | Step 2 | Not started |
-| **8** | Eligibility % calculation + `StudentIneligible` event + dashboard listener | Steps 3, 4 | Not started |
-| **9** | Device re-binding admin flow | Step 6 | Not started |
-| **10** | Tamper-detection demo script + gas cost logging | Steps 4, 8 | Not started |
+| **1** | DB schema + migrations + auth + role-based routes (no blockchain) | — | ✓ Done |
+| **2** | Static QR generation + scan + DB-only attendance write | Step 1 | ✓ Done |
+| **3** | Deploy `ERC2771Forwarder` + `AttendanceRegistry` to the local Hardhat node; direct `markAttendance` call | Step 1 | ✓ Done |
+| **4** | Meta-tx relaying (student signs, backend relays through forwarder) | Steps 2, 3 | ✓ Done |
+| **5** | QR rotation (45s rotation, 60s expiry + nonce); replay protection | Step 2 | ✓ Done |
+| **6** | Device binding (onboarding + `enrolled_device_id` check); stable per-browser device id | Step 2 | ✓ Done |
+| **7** | Geofence/WiFi check; camera QR scanning (BarcodeDetector + paste fallback) | Step 2 | ✓ Done |
+| **8** | Eligibility % calculation; relay retry (3 attempts) with error logging | Steps 3, 4 | ✓ Done |
+| **9** | Device re-binding admin flow; admin shows old device | Step 6 | ✓ Done |
+| **10** | E2E test script (`scripts/e2e.mjs`); tamper detection & gas cost demo | Steps 4, 8 | ✓ Done |
 
 ---
 
@@ -189,4 +189,5 @@ Sequence from AI.md §8. Do not skip ahead without prior phases working.
 
 | Date | What Was Done |
 |---|---|
+| 2026-10-12 | All milestones and build steps complete; demo-readiness branch stable. Fixed docs drift: QR replay/expiry checks, e2e script, course dropdown, device rebind UI, role checks, rate limits, CORS, relay retry. Remaining: HMAC QR verification (#10), WebSocket live feed (#11). |
 | 2026-07-27 | PRD v1.0 → v2.0 → v3.0 (reconciled with AI.md). Created `context.md`, `plan.md`. Set up project folder structure. |

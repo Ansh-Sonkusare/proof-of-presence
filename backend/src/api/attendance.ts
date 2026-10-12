@@ -1,7 +1,7 @@
 import { HttpApiBuilder } from "@effect/platform";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schedule } from "effect";
 import { ethers } from "ethers";
-import { AttendanceApi, CurrentUser } from "@pbl/shared";
+import { AttendanceApi } from "@pbl/shared";
 import { Database } from "../services/database.js";
 import { BlockchainService } from "../services/blockchain.js";
 import {
@@ -15,6 +15,7 @@ import {
   BadRequest,
 } from "../errors/index.js";
 import { AuthMiddlewareLive } from "./middleware.js";
+import { requireStudent, requireSelfOrStaff } from "./students.js";
 
 const catchDb = <A>(effect: Effect.Effect<A, any, any>) =>
   effect.pipe(
@@ -42,6 +43,20 @@ const FORWARD_REQUEST_TYPES = {
 const uuidToUint256 = (uuid: string): bigint =>
   BigInt("0x" + uuid.replace(/-/g, ""));
 
+// ponytail: in-memory, per-process; use a shared store (redis) if scaled out
+const hits = new Map<string, number[]>();
+const rateLimit = (userId: string) =>
+  Effect.suspend(() => {
+    const now = Date.now();
+    const recent = (hits.get(userId) ?? []).filter((t) => now - t < 60_000);
+    if (recent.length >= 10) {
+      hits.set(userId, recent);
+      return Effect.fail(new BadRequest({ message: "rate limited" }));
+    }
+    hits.set(userId, [...recent, now]);
+    return Effect.void;
+  });
+
 export const AttendanceGroupLive = HttpApiBuilder.group(
   AttendanceApi,
   "attendance",
@@ -50,9 +65,10 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
       .handle("prepare", ({ payload }) =>
         catchDb(
           Effect.gen(function* () {
+            const currentUser = yield* requireStudent;
+            yield* rateLimit(currentUser.id);
             const db = yield* Database;
             const blockchain = yield* BlockchainService;
-            const currentUser = yield* CurrentUser;
 
             // 1. Get session
             const session = yield* db.session.findById(payload.sessionId);
@@ -66,20 +82,22 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
               return yield* new SessionEnded({});
             }
 
-            // 2. Verify QR nonce is active
+            // 2. Verify QR nonce is active (unknown or past expiry => expired)
             const qrRotation = yield* db.qrRotation.findActive(
               payload.sessionId,
               payload.nonce
             );
             if (!qrRotation) {
-              const usedRotation = yield* db.qrRotation.findUsed(
-                payload.sessionId,
-                payload.nonce
-              );
-              if (usedRotation) {
-                return yield* new QrReplay({});
-              }
               return yield* new QrExpired({});
+            }
+
+            // 2b. One accepted scan per student per session: a re-scan is a replay
+            const alreadyMarked = yield* db.attendanceRecord.findAcceptedBySessionAndStudent(
+              payload.sessionId,
+              currentUser.id
+            );
+            if (alreadyMarked) {
+              return yield* new QrReplay({});
             }
 
             // 3. Verify device matches enrolled device
@@ -142,9 +160,10 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
       .handle("markAttendance", ({ payload }) =>
         catchDb(
           Effect.gen(function* () {
+            const currentUser = yield* requireStudent;
+            yield* rateLimit(currentUser.id);
             const db = yield* Database;
             const blockchain = yield* BlockchainService;
-            const currentUser = yield* CurrentUser;
 
             // 1. Session still active
             const session = yield* db.session.findById(payload.sessionId);
@@ -236,7 +255,17 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
                 request: payload.request,
                 signature: payload.signature,
               })
-              .pipe(Effect.catchAll(() => Effect.succeed(undefined)));
+              .pipe(
+                Effect.retry({
+                  schedule: Schedule.exponential("200 millis"),
+                  times: 2,
+                }),
+                Effect.catchAllCause((cause) =>
+                  Effect.logError("relayAttendance failed", cause).pipe(
+                    Effect.as(undefined)
+                  )
+                )
+              );
 
             if (txHash) {
               yield* db.attendanceRecord.updateTxHash(record.id, txHash);
@@ -254,6 +283,7 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
       .handle("getStudentAttendance", ({ path }) =>
         catchDb(
           Effect.gen(function* () {
+            yield* requireSelfOrStaff(path.studentId);
             const db = yield* Database;
 
             const records = yield* db.attendanceRecord.findByStudentAndCourse(
