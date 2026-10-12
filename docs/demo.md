@@ -40,7 +40,7 @@ All seeded by `run-dev.sh`. Password for every account: **`password123`**
 | Student | student1@pbl.edu | Alice Student — main demo account |
 | Student | student2@pbl.edu | Bob Student — second device to test proxy rejection |
 
-The seeded course is **PBL - Blockchain Attendance** (ID `00000000-0000-4000-8000-000000000001`). Faculty must enter this ID when starting a session.
+The seeded course is **PBL - Blockchain Attendance**. Faculty selects it from the course dropdown when starting a session.
 
 ---
 
@@ -51,7 +51,7 @@ Run this end-to-end flow to show all three layers of anti-proxy protection.
 ### 1 — Faculty starts a session
 
 1. Open http://localhost:3000 in Chrome and log in as `faculty@pbl.edu`.
-2. Enter the course ID `00000000-0000-4000-8000-000000000001` and click **Start Session**.
+2. From the **Course** dropdown, select **PBL - Blockchain Attendance** and click **Start Session**.
 3. A QR code appears and auto-rotates every 45 seconds.
 
 ### 2 — Student onboards (first time only)
@@ -77,10 +77,14 @@ Back on the Faculty tab, the **Live Scans** table updates with the student's nam
 | Scenario | How to trigger | Expected result |
 | --- | --- | --- |
 | Wrong device | Log in as `student1` in a fresh browser profile (different `device_id`) and try to scan | Rejected: `device_mismatch` |
-| Replayed nonce | Paste the same QR JSON twice | Rejected: `nonce_already_used` |
-| Expired QR | Wait 60 s after the last rotation, paste the old nonce | Rejected: `qr_expired` |
+| Replayed nonce | Scanning again after being marked once | Rejected: `QrReplay` |
+| Expired QR | Wait 60 s after the last rotation, then scan the old QR | Rejected: `QrExpired` |
 
 ---
+
+## Terminal Demo (one command)
+
+With the stack running, `npm run e2e` drives the whole flow against the real API and chain and prints one line per check: logins, wallet + device onboarding, wrong-device rejection, out-of-geofence rejection, EIP-712 sign + gasless relay (prints the tx hash), QR replay rejection, live feed, on-chain `attendedCount`, session end, student history. Good fallback if the camera/browser misbehaves during a presentation.
 
 ## On-Chain Verification & Tamper Demo
 
@@ -114,4 +118,4 @@ The script:
 
 ### Swagger / API explorer
 
-All 15 endpoints are self-documented at http://localhost:3001/docs while the backend is running.
+All 15 endpoints are self-documented at http://localhost:3001/docs while the backend is running. API routes are under the `/api` prefix (e.g., `POST http://localhost:3001/api/auth/login`).

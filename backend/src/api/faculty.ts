@@ -35,6 +35,15 @@ export const FacultyGroupLive = HttpApiBuilder.group(
   "faculty",
   (handlers) =>
     handlers
+      .handle("listCourses", () =>
+        catchDb(
+          Effect.gen(function* () {
+            const currentUser = yield* requireFaculty;
+            const db = yield* Database;
+            return yield* db.course.findByFacultyId(currentUser.id);
+          })
+        )
+      )
       .handle("createSession", ({ payload }) =>
         catchDb(
           Effect.gen(function* () {

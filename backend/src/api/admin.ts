@@ -88,7 +88,7 @@ export const AdminGroupLive = HttpApiBuilder.group(
               studentId: r.studentId,
               studentName: r.student?.name ?? "Unknown",
               studentEmail: r.student?.email ?? "Unknown",
-              oldDeviceId: r.oldDeviceId ?? undefined,
+              oldDeviceId: r.oldDeviceId ?? r.student?.enrolledDeviceId ?? undefined,
               newDeviceId: r.newDeviceId,
               status: r.status,
               createdAt: r.createdAt.toISOString(),
