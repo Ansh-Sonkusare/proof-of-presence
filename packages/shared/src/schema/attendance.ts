@@ -43,6 +43,8 @@ export type ForwardRequestDomain = typeof ForwardRequestDomain.Type;
 export const PrepareAttendancePayload = Schema.Struct({
   sessionId: Schema.String,
   nonce: Schema.String,
+  expiry: Schema.String,
+  hmac: Schema.String,
   deviceId: Schema.String,
   gpsLat: Schema.optional(Schema.Number),
   gpsLon: Schema.optional(Schema.Number),

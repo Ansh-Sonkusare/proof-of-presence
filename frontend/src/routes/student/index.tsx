@@ -212,7 +212,7 @@ function StudentDashboard() {
     setSuccess("");
     try {
       const parsed = JSON.parse(qrData);
-      const { sessionId, nonce } = parsed;
+      const { sessionId, nonce, expiry, hmac } = parsed;
 
       const privateKey = localStorage.getItem("student_wallet_key");
       if (!privateKey) {
@@ -247,6 +247,8 @@ function StudentDashboard() {
         payload: {
           sessionId,
           nonce,
+          expiry,
+          hmac,
           deviceId: `device-${getInstallationId()}`,
           gpsLat,
           gpsLon,

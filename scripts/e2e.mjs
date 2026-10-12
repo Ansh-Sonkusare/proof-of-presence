@@ -53,11 +53,14 @@ const qr = await call("GET", `/faculty/sessions/${sessionId}/qr`, faculty);
 ok(qr.status === 200 && qr.json.nonce, "faculty gets QR");
 
 const prepare = (token, extra) =>
-  call("POST", "/attendance/prepare", token, { sessionId, nonce: qr.json.nonce, deviceId, gpsLat: 21.1458, gpsLon: 79.0882, ...extra });
+  call("POST", "/attendance/prepare", token, { sessionId, nonce: qr.json.nonce, expiry: qr.json.expiry, hmac: qr.json.hmac, deviceId, gpsLat: 21.1458, gpsLon: 79.0882, ...extra });
 
 // Proxy attempts
 let r = await prepare(student, { deviceId: "someone-elses-phone" });
 ok(r.status >= 400, `wrong device rejected (${r.json._tag ?? r.status})`);
+const bad = qr.json.hmac.slice(0, -1) + (qr.json.hmac.endsWith("0") ? "1" : "0");
+r = await prepare(student, { hmac: bad });
+ok(r.status >= 400, `tampered hmac rejected (${r.json._tag ?? r.status})`);
 r = await prepare(student, { gpsLat: 19.076, gpsLon: 72.8777 });
 ok(r.status >= 400, `out-of-geofence rejected (${r.json._tag ?? r.status})`);
 

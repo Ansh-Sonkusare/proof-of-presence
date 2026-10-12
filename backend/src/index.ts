@@ -15,6 +15,7 @@ import {
   AdminGroupLive,
   AttendanceGroupLive,
 } from "./api/index.js";
+import { LiveStreamLive } from "./api/live.js";
 
 const ApiLive = HttpApiBuilder.api(AttendanceApi).pipe(
   Layer.provide(AuthGroupLive),
@@ -36,6 +37,7 @@ const program = HttpApiBuilder.serve(HttpMiddleware.logger).pipe(
   })),
   Layer.provide(HttpApiSwagger.layer()),
   Layer.provide(ApiLive),
+  Layer.provide(LiveStreamLive),
   HttpServer.withLogAddress,
   Layer.provide(NodeHttpServer.layer(createServer, { port })),
   Layer.launch
