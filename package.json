@@ -16,5 +16,8 @@
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "overrides": {
+    "vite": "^8.0.0"
   }
 }

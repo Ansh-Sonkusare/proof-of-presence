@@ -66,20 +66,22 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
               return yield* new SessionEnded({});
             }
 
-            // 2. Verify QR nonce is active
+            // 2. Verify QR nonce is active (unknown or past expiry => expired)
             const qrRotation = yield* db.qrRotation.findActive(
               payload.sessionId,
               payload.nonce
             );
             if (!qrRotation) {
-              const usedRotation = yield* db.qrRotation.findUsed(
-                payload.sessionId,
-                payload.nonce
-              );
-              if (usedRotation) {
-                return yield* new QrReplay({});
-              }
               return yield* new QrExpired({});
+            }
+
+            // 2b. One accepted scan per student per session: a re-scan is a replay
+            const alreadyMarked = yield* db.attendanceRecord.findAcceptedBySessionAndStudent(
+              payload.sessionId,
+              currentUser.id
+            );
+            if (alreadyMarked) {
+              return yield* new QrReplay({});
             }
 
             // 3. Verify device matches enrolled device

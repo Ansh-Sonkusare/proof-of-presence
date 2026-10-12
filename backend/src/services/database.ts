@@ -127,13 +127,6 @@ export class Database extends Effect.Service<Database>()("Database", {
               },
             })
           ),
-
-        findUsed: (sessionId: string, nonce: string) =>
-          tryQuery(
-            prisma.qrRotation.findFirst({
-              where: { sessionId, nonce },
-            })
-          ),
       },
 
       attendanceRecord: {
