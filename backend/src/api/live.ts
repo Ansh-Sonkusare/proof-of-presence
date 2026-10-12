@@ -6,7 +6,7 @@ import {
 } from "@effect/platform";
 import { Effect, Layer, Schedule, Stream } from "effect";
 import { Database } from "../services/database.js";
-import { QrService } from "../services/qr.js";
+import { QrService, qrSigningInput } from "../services/qr.js";
 import { AuthService } from "../services/auth.js";
 import { qrSecretFromEnv } from "../config/index.js";
 
@@ -57,7 +57,7 @@ export const LiveStreamLive = HttpApiBuilder.Router.use((router) =>
             yield* db.qrRotation.create({ sessionId: sessionId!, nonce, expiresAt });
             const hmac = yield* qr.signPayload(
               qrSecretFromEnv(),
-              `${sessionId}:${nonce}:${expiresAt.toISOString()}`
+              qrSigningInput(sessionId!, nonce, expiresAt.toISOString())
             );
             current = {
               issuedAt: Date.now(),

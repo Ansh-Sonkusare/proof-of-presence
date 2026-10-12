@@ -1,6 +1,11 @@
 import { Effect, Layer } from "effect";
 import crypto from "node:crypto";
 
+// The one place the signed QR string is defined: issuers and the verifier
+// must agree byte-for-byte.
+export const qrSigningInput = (sessionId: string, nonce: string, expiry: string) =>
+  `${sessionId}|${nonce}|${expiry}`;
+
 const QR_ROTATION_INTERVAL_MS = 45_000; // 45 seconds
 const QR_EXPIRY_SECONDS = 60; // 60 second validity window
 

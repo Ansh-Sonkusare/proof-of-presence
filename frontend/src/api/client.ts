@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Cause, Effect, Exit } from "effect";
 import {
   FetchHttpClient,
   HttpApiClient,
@@ -34,8 +34,13 @@ async function buildClient() {
   for (const group of Object.keys(rawAny)) {
     wrapped[group] = {};
     for (const method of Object.keys(rawAny[group])) {
-      wrapped[group][method] = (...args: any[]) =>
-        Effect.runPromise(rawAny[group][method](...args));
+      // runPromise would reject with a FiberFailure wrapper; throw the
+      // original tagged error so callers can read its _tag.
+      wrapped[group][method] = async (...args: any[]) => {
+        const exit = await Effect.runPromiseExit(rawAny[group][method](...args));
+        if (Exit.isSuccess(exit)) return exit.value;
+        throw Cause.squash(exit.cause);
+      };
     }
   }
   return wrapped;

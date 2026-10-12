@@ -1,3 +1,4 @@
+import { errorText } from "@/lib/errors.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { getApiClient } from "@/api/client.js";
@@ -33,6 +34,7 @@ function AdminDashboard() {
   const [pendingRebinds, setPendingRebinds] = useState<any[]>([]);
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
+  const [courses, setCourses] = useState<{ id: string; name: string }[]>([]);
   const [reportCourseId, setReportCourseId] = useState("");
   const [courseReport, setCourseReport] = useState<any>(null);
 
@@ -55,6 +57,13 @@ function AdminDashboard() {
   useEffect(() => {
     loadUsers();
     loadPendingRebinds();
+    getApiClient()
+      .then((c) => c.admin.listAllCourses())
+      .then((cs) => {
+        setCourses([...cs]);
+        setReportCourseId((cur) => cur || cs[0]?.id || "");
+      })
+      .catch((err: any) => setError(errorText(err) || "Failed to load courses"));
   }, [loadUsers, loadPendingRebinds]);
 
   const handleCreateUser = async () => {
@@ -83,7 +92,7 @@ function AdminDashboard() {
       setNewUser({ name: "", email: "", role: "student", enrollmentNo: "", password: "" });
       loadUsers();
     } catch (err: any) {
-      setError(err?.message || "Failed to create user");
+      setError(errorText(err) || "Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -101,7 +110,7 @@ function AdminDashboard() {
       loadPendingRebinds();
       loadUsers();
     } catch (err: any) {
-      setError(err?.message || "Failed to approve rebind");
+      setError(errorText(err) || "Failed to approve rebind");
     } finally {
       setLoading(false);
       setApprovingId(null);
@@ -120,7 +129,7 @@ function AdminDashboard() {
       });
       setCourseReport(report);
     } catch (err: any) {
-      setError(err?.message || "Failed to load report");
+      setError(errorText(err) || "Failed to load report");
     } finally {
       setLoading(false);
     }
@@ -171,7 +180,7 @@ function AdminDashboard() {
             <ShieldCheck className="h-6 w-6 text-green-600" />
             <h3 className="text-lg font-semibold text-gray-900">Courses</h3>
           </div>
-          <p className="text-3xl font-bold text-gray-900">—</p>
+          <p className="text-3xl font-bold text-gray-900">{courses.length}</p>
           <p className="text-sm text-gray-500">Manage courses</p>
         </div>
       </div>
@@ -222,13 +231,17 @@ function AdminDashboard() {
           </h3>
         </div>
         <div className="flex gap-2 mb-4">
-          <input
-            type="text"
+          <select
             value={reportCourseId}
             onChange={(e) => setReportCourseId(e.target.value)}
-            placeholder="Course ID (uuid)"
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
+          >
+            {courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
           <button
             onClick={handleLoadReport}
             disabled={!reportCourseId || loading}

@@ -1,3 +1,4 @@
+import { errorText } from "@/lib/errors.js";
 import {
   createFileRoute,
   redirect,
@@ -7,6 +8,8 @@ import { useState } from "react";
 import { login, getUser } from "@/lib/auth.js";
 
 export const Route = createFileRoute("/")({
+  // Guards read localStorage, which only exists in the browser.
+  ssr: false,
   beforeLoad: () => {
     const user = getUser();
     if (user) {
@@ -41,7 +44,7 @@ function LoginPage() {
         navigate({ to: "/admin" });
       }
     } catch (err: any) {
-      setError(err?.message || "Login failed. Please check your credentials.");
+      setError(errorText(err) || "Login failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }

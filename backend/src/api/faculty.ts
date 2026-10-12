@@ -2,7 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
 import { AttendanceApi, CurrentUser } from "@pbl/shared";
 import { Database, DatabaseError } from "../services/database.js";
-import { QrService } from "../services/qr.js";
+import { QrService, qrSigningInput } from "../services/qr.js";
 import { BlockchainService } from "../services/blockchain.js";
 import { qrSecretFromEnv } from "../config/index.js";
 import {
@@ -41,6 +41,24 @@ export const FacultyGroupLive = HttpApiBuilder.group(
             const currentUser = yield* requireFaculty;
             const db = yield* Database;
             return yield* db.course.findByFacultyId(currentUser.id);
+          })
+        )
+      )
+      .handle("listActiveSessions", () =>
+        catchDb(
+          Effect.gen(function* () {
+            const currentUser = yield* requireFaculty;
+            const db = yield* Database;
+            const sessions = yield* db.session.listActiveByFacultyId(currentUser.id);
+            return sessions.map((s) => ({
+              id: s.id,
+              courseId: s.courseId,
+              startedAt: s.startedAt.toISOString(),
+              classroomLat: s.classroomLat ?? undefined,
+              classroomLon: s.classroomLon ?? undefined,
+              geofenceRadiusM: s.geofenceRadiusM,
+              classroomWifiBssid: s.classroomWifiBssid ?? undefined,
+            }));
           })
         )
       )
@@ -104,7 +122,7 @@ export const FacultyGroupLive = HttpApiBuilder.group(
               expiresAt,
             });
 
-            const dataToSign = `${path.sessionId}|${nonce}|${expiresAt.toISOString()}`;
+            const dataToSign = qrSigningInput(path.sessionId, nonce, expiresAt.toISOString());
             const hmac = yield* qr.signPayload(qrSecretFromEnv(), dataToSign);
 
             return {

@@ -32,7 +32,7 @@ async function main() {
 
   const student1 = await prisma.user.upsert({
     where: { email: "student1@pbl.edu" },
-    update: {},
+    update: { walletAddress: null, enrolledDeviceId: null },
     create: {
       role: "student",
       name: "Alice Student",
@@ -43,11 +43,23 @@ async function main() {
 
   const student2 = await prisma.user.upsert({
     where: { email: "student2@pbl.edu" },
-    update: {},
+    update: { walletAddress: null, enrolledDeviceId: null },
     create: {
       role: "student",
       name: "Bob Student",
       email: "student2@pbl.edu",
+      password: passwordHash,
+    },
+  });
+
+  // Used only by scripts/e2e.mjs, so running it never clobbers the demo students.
+  await prisma.user.upsert({
+    where: { email: "e2e@pbl.edu" },
+    update: {},
+    create: {
+      role: "student",
+      name: "E2E Bot",
+      email: "e2e@pbl.edu",
       password: passwordHash,
     },
   });
@@ -60,6 +72,12 @@ async function main() {
       name: "PBL - Blockchain Attendance",
       facultyId: faculty.id,
     },
+  });
+
+  // Close sessions left open by earlier runs so the faculty page starts clean.
+  await prisma.session.updateMany({
+    where: { endedAt: null },
+    data: { endedAt: new Date() },
   });
 
   console.log("Seed complete:");

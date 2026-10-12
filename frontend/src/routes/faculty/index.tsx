@@ -1,3 +1,4 @@
+import { errorText } from "@/lib/errors.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -33,7 +34,7 @@ function FacultyDashboard() {
       setSuccess("Session started!");
       refreshQr(session.id);
     } catch (err: any) {
-      setError(err?.message || "Failed to create session");
+      setError(errorText(err) || "Failed to create session");
     } finally {
       setLoading(false);
     }
@@ -45,7 +46,7 @@ function FacultyDashboard() {
       const qr = await client.faculty.getQr({ path: { sessionId } });
       setQrPayload(qr);
     } catch (err: any) {
-      setError(err?.message || "Failed to fetch QR");
+      setError(errorText(err) || "Failed to fetch QR");
     }
   };
 
@@ -63,7 +64,7 @@ function FacultyDashboard() {
       setLiveScans([]);
       setSuccess("Session ended");
     } catch (err: any) {
-      setError(err?.message || "Failed to end session");
+      setError(errorText(err) || "Failed to end session");
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,16 @@ function FacultyDashboard() {
         setCourses([...cs]);
         setSelectedCourseId((cur) => cur || cs[0]?.id || "");
       })
-      .catch((err: any) => setError(err?.message || "Failed to load courses"));
+      .catch((err: any) => setError(errorText(err) || "Failed to load courses"));
+    getApiClient()
+      .then((c) => c.faculty.listActiveSessions())
+      .then((ss) => {
+        if (ss[0]) {
+          setActiveSession(ss[0]);
+          refreshQr(ss[0].id);
+        }
+      })
+      .catch((err: any) => setError(errorText(err) || "Failed to load active session"));
   }, []);
 
   // Server push via SSE; fall back to polling after repeated EventSource errors.
@@ -153,7 +163,7 @@ function FacultyDashboard() {
               </div>
               <div>
                 <span className="text-gray-600">Course:</span>
-                <p className="mt-1 font-medium">{activeSession.courseId}</p>
+                <p className="mt-1 font-medium">{courses.find((c) => c.id === activeSession.courseId)?.name ?? activeSession.courseId}</p>
               </div>
             </div>
 
