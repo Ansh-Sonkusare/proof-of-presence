@@ -104,7 +104,7 @@ export const FacultyGroupLive = HttpApiBuilder.group(
               expiresAt,
             });
 
-            const dataToSign = `${path.sessionId}:${nonce}:${expiresAt.toISOString()}`;
+            const dataToSign = `${path.sessionId}|${nonce}|${expiresAt.toISOString()}`;
             const hmac = yield* qr.signPayload(qrSecretFromEnv(), dataToSign);
 
             return {

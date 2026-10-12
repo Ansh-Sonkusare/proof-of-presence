@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { getApiClient } from "@/api/client.js";
+import { getToken } from "@/lib/auth.js";
 import { Play, Square, Users, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 
 export const Route = createFileRoute("/faculty/")({
@@ -89,13 +90,34 @@ function FacultyDashboard() {
       .catch((err: any) => setError(err?.message || "Failed to load courses"));
   }, []);
 
+  // Server push via SSE; fall back to polling after repeated EventSource errors.
   useEffect(() => {
     if (!activeSession) return;
-    const interval = setInterval(() => {
-      refreshQr(activeSession.id);
-      refreshScans();
-    }, 30_000);
-    return () => clearInterval(interval);
+    let poll: ReturnType<typeof setInterval> | undefined;
+    let errors = 0;
+    const base = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
+    const es = new EventSource(
+      `${base}/api/faculty/sessions/${activeSession.id}/stream?token=${encodeURIComponent(getToken() ?? "")}`
+    );
+    es.onmessage = (e) => {
+      errors = 0;
+      const d = JSON.parse(e.data);
+      setQrPayload(d.qr);
+      setLiveScans(d.scans);
+    };
+    es.addEventListener("ended", () => es.close());
+    es.onerror = () => {
+      if (++errors < 3 || poll) return;
+      es.close();
+      poll = setInterval(() => {
+        refreshQr(activeSession.id);
+        refreshScans();
+      }, 30_000);
+    };
+    return () => {
+      es.close();
+      if (poll) clearInterval(poll);
+    };
   }, [activeSession]);
 
   return (

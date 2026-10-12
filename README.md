@@ -87,10 +87,10 @@ Login as one of the seeded users (see `backend/prisma/seed.ts`). Frontend: http:
 ✓ Per-user rate limit on attendance endpoints  
 ✓ Faculty course dropdown (GET `/api/faculty/courses`)  
 ✓ Admin rebind shows old device, stable per-browser device id  
+✓ QR payloads HMAC-signed and verified on `prepare` (tampered QR → `SignatureInvalid`)  
+✓ Faculty live feed pushed over Server-Sent Events (`/api/faculty/sessions/:id/stream`), polling fallback  
 
 ### Known Gaps & Open Issues
-- **QR HMAC signing** (#10) — QR payloads carry an `hmac` field but it is not generated or verified server-side  
-- **WebSocket live feed** (#11) — faculty QR refresh still polls (30s); real-time via WebSocket pending  
 - **Contracts:** on-chain eligibility checking not wired to frontend (percentage read from DB only)  
 - **Backend:** no unit tests beyond e2e  
 - **Security (dev-grade):** wallet private keys in localStorage; `.env.example` has Hardhat's default key (never production); JWT secret has hardcoded fallback  

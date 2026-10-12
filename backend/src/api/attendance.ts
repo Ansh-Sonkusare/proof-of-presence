@@ -1,6 +1,9 @@
 import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Schedule } from "effect";
+import crypto from "node:crypto";
 import { ethers } from "ethers";
+import { QrService } from "../services/qr.js";
+import { qrSecretFromEnv } from "../config/index.js";
 import { AttendanceApi } from "@pbl/shared";
 import { Database } from "../services/database.js";
 import { BlockchainService } from "../services/blockchain.js";
@@ -69,6 +72,7 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
             yield* rateLimit(currentUser.id);
             const db = yield* Database;
             const blockchain = yield* BlockchainService;
+            const qr = yield* QrService;
 
             // 1. Get session
             const session = yield* db.session.findById(payload.sessionId);
@@ -80,6 +84,25 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
             }
             if (session.endedAt) {
               return yield* new SessionEnded({});
+            }
+
+            // 1b. Verify QR signature and expiry before touching the DB
+            const expected = Buffer.from(
+              yield* qr.signPayload(
+                qrSecretFromEnv(),
+                `${payload.sessionId}|${payload.nonce}|${payload.expiry}`
+              ),
+              "hex"
+            );
+            const given = Buffer.from(payload.hmac, "hex");
+            if (
+              given.length !== expected.length ||
+              !crypto.timingSafeEqual(given, expected)
+            ) {
+              return yield* new SignatureInvalid({});
+            }
+            if (!(new Date(payload.expiry).getTime() > Date.now())) {
+              return yield* new QrExpired({});
             }
 
             // 2. Verify QR nonce is active (unknown or past expiry => expired)
@@ -329,6 +352,7 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
 ).pipe(
   Layer.provide(Database.Default),
   Layer.provide(BlockchainService.Default),
+  Layer.provide(QrService.Default),
   Layer.provide(AuthMiddlewareLive)
 );
 
