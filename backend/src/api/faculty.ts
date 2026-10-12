@@ -2,7 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer } from "effect";
 import { AttendanceApi, CurrentUser } from "@pbl/shared";
 import { Database, DatabaseError } from "../services/database.js";
-import { QrService } from "../services/qr.js";
+import { QrService, qrSigningInput } from "../services/qr.js";
 import { BlockchainService } from "../services/blockchain.js";
 import { qrSecretFromEnv } from "../config/index.js";
 import {
@@ -104,7 +104,7 @@ export const FacultyGroupLive = HttpApiBuilder.group(
               expiresAt,
             });
 
-            const dataToSign = `${path.sessionId}|${nonce}|${expiresAt.toISOString()}`;
+            const dataToSign = qrSigningInput(path.sessionId, nonce, expiresAt.toISOString());
             const hmac = yield* qr.signPayload(qrSecretFromEnv(), dataToSign);
 
             return {

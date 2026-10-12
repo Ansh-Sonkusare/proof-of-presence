@@ -2,6 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { getUser, logout } from "@/lib/auth.js";
 
 export const Route = createFileRoute("/faculty")({
+  // Guards read localStorage, which only exists in the browser.
+  ssr: false,
   beforeLoad: () => {
     const user = getUser();
     if (!user || user.role !== "faculty") {

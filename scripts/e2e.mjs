@@ -35,7 +35,7 @@ const login = async (email) =>
   (await call("POST", "/auth/login", null, { email, password: "password123" })).json.token;
 
 const faculty = await login("faculty@pbl.edu");
-const student = await login("student1@pbl.edu");
+const student = await login("e2e@pbl.edu");
 const other = await login("student2@pbl.edu");
 ok(faculty && student && other, "logins");
 
@@ -49,8 +49,17 @@ ok((await call("POST", "/students/onboard-device", student, { deviceId })).statu
 const session = await call("POST", "/faculty/sessions", faculty, { courseId: COURSE, classroomLat: 21.1458, classroomLon: 79.0882 });
 ok(session.status === 200, "faculty starts session", session.json);
 const sessionId = session.json.id;
-const qr = await call("GET", `/faculty/sessions/${sessionId}/qr`, faculty);
-ok(qr.status === 200 && qr.json.nonce, "faculty gets QR");
+const polled = await call("GET", `/faculty/sessions/${sessionId}/qr`, faculty);
+ok(polled.status === 200 && polled.json.nonce, "faculty gets QR");
+
+// The faculty screen shows the QR from the SSE stream, so scan that one.
+const stream = await fetch(`${API}/faculty/sessions/${sessionId}/stream?token=${faculty}`);
+const reader = stream.body.getReader();
+let buf = "";
+while (!buf.includes("\n\n")) buf += new TextDecoder().decode((await reader.read()).value);
+reader.cancel();
+const qr = { json: JSON.parse(buf.match(/^data: (.*)$/m)[1]).qr };
+ok(qr.json?.hmac, "faculty live stream pushes QR");
 
 const prepare = (token, extra) =>
   call("POST", "/attendance/prepare", token, { sessionId, nonce: qr.json.nonce, expiry: qr.json.expiry, hmac: qr.json.hmac, deviceId, gpsLat: 21.1458, gpsLon: 79.0882, ...extra });
@@ -63,6 +72,8 @@ r = await prepare(student, { hmac: bad });
 ok(r.status >= 400, `tampered hmac rejected (${r.json._tag ?? r.status})`);
 r = await prepare(student, { gpsLat: 19.076, gpsLon: 72.8777 });
 ok(r.status >= 400, `out-of-geofence rejected (${r.json._tag ?? r.status})`);
+r = await prepare(student, { gpsLat: undefined, gpsLon: undefined });
+ok(r.status >= 400, `missing location rejected (${r.json._tag ?? r.status})`);
 
 // Happy path: prepare -> sign EIP-712 -> relay
 r = await prepare(student);

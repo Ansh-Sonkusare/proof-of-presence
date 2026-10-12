@@ -1,3 +1,4 @@
+import { errorText } from "@/lib/errors.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { getUser } from "@/lib/auth.js";
 import { useState, useEffect, useRef } from "react";
@@ -122,6 +123,10 @@ function StudentDashboard() {
     (async () => {
       try {
         const client = await getApiClient();
+        // localStorage copy of the user can be stale (e.g. after a re-seed)
+        const me = await client.auth.me();
+        setWalletAddress(me.walletAddress);
+        setEnrolledDevice(me.enrolledDeviceId);
         const courses: any[] = await client.students.getStudentCourses({
           path: { studentId: user.id },
         });
@@ -159,7 +164,7 @@ function StudentDashboard() {
       setSuccess(`Wallet created. Address: ${wallet.address}. Save your recovery phrase!`);
       localStorage.setItem("student_wallet_key", wallet.privateKey);
     } catch (err: any) {
-      setError(err?.message || "Failed to onboard wallet");
+      setError(errorText(err) || "Failed to onboard wallet");
     } finally {
       setLoading(false);
     }
@@ -178,7 +183,7 @@ function StudentDashboard() {
       setEnrolledDevice(deviceId);
       setSuccess(`Device enrolled: ${deviceId}`);
     } catch (err: any) {
-      setError(err?.message || "Failed to enroll device");
+      setError(errorText(err) || "Failed to enroll device");
     } finally {
       setLoading(false);
     }
@@ -199,7 +204,7 @@ function StudentDashboard() {
         "Rebind requested. Attendance is locked until an admin approves the new device."
       );
     } catch (err: any) {
-      setError(err?.message || "Failed to request device rebind");
+      setError(errorText(err) || "Failed to request device rebind");
     } finally {
       setLoading(false);
     }
@@ -227,8 +232,11 @@ function StudentDashboard() {
       let gpsLat: number | undefined;
       let gpsLon: number | undefined;
       try {
+        // Chrome's own timeout doesn't run while the permission prompt is open,
+        // so race it: an unanswered prompt must not hang the scan past QR expiry.
         const geolocation = await new Promise<GeolocationPosition>(
           (resolve, reject) => {
+            setTimeout(() => reject(new Error("geolocation timeout")), 10000);
             navigator.geolocation.getCurrentPosition(resolve, reject, {
               enableHighAccuracy: true,
               timeout: 10000,
@@ -238,7 +246,7 @@ function StudentDashboard() {
         gpsLat = geolocation.coords.latitude;
         gpsLon = geolocation.coords.longitude;
       } catch {
-        // geolocation unavailable/denied — course has no geofence, skip
+        // geolocation unavailable/denied — backend rejects if the session is geofenced
       }
 
       // 1. Ask the backend to validate the session and build the request
@@ -291,7 +299,7 @@ function StudentDashboard() {
         setScanError(`Attendance rejected. Record hash: ${result.recordHash}`);
       }
     } catch (err: any) {
-      setScanError(err?.message || "Failed to mark attendance");
+      setScanError(errorText(err) || "Failed to mark attendance");
     } finally {
       setLoading(false);
     }

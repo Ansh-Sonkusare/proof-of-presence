@@ -2,7 +2,7 @@ import { HttpApiBuilder } from "@effect/platform";
 import { Effect, Layer, Schedule } from "effect";
 import crypto from "node:crypto";
 import { ethers } from "ethers";
-import { QrService } from "../services/qr.js";
+import { QrService, qrSigningInput } from "../services/qr.js";
 import { qrSecretFromEnv } from "../config/index.js";
 import { AttendanceApi } from "@pbl/shared";
 import { Database } from "../services/database.js";
@@ -90,7 +90,7 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
             const expected = Buffer.from(
               yield* qr.signPayload(
                 qrSecretFromEnv(),
-                `${payload.sessionId}|${payload.nonce}|${payload.expiry}`
+                qrSigningInput(payload.sessionId, payload.nonce, payload.expiry)
               ),
               "hex"
             );
@@ -139,25 +139,25 @@ export const AttendanceGroupLive = HttpApiBuilder.group(
               return yield* new BadRequest({ message: "No wallet enrolled" });
             }
 
-            // 4. Verify geofence or WiFi BSSID
-            if (
-              session.classroomLat &&
-              session.classroomLon &&
-              payload.gpsLat &&
-              payload.gpsLon
-            ) {
-              const distance = haversineDistance(
-                session.classroomLat,
-                session.classroomLon,
-                payload.gpsLat,
-                payload.gpsLon
-              );
-              if (distance > session.geofenceRadiusM) {
-                yield* recordRejection(db, currentUser.id, payload, "out_of_range");
-                return yield* new OutOfRange({});
-              }
-            } else if (session.classroomWifiBssid && payload.wifiBssid) {
-              if (session.classroomWifiBssid !== payload.wifiBssid) {
+            // 4. Verify geofence or WiFi BSSID. A constrained session requires
+            //    proof: missing GPS/BSSID is a rejection, not a skip.
+            const geofenced =
+              session.classroomLat != null && session.classroomLon != null;
+            if (geofenced || session.classroomWifiBssid) {
+              const gpsOk =
+                geofenced &&
+                payload.gpsLat != null &&
+                payload.gpsLon != null &&
+                haversineDistance(
+                  session.classroomLat!,
+                  session.classroomLon!,
+                  payload.gpsLat,
+                  payload.gpsLon
+                ) <= session.geofenceRadiusM;
+              const wifiOk =
+                !!session.classroomWifiBssid &&
+                session.classroomWifiBssid === payload.wifiBssid;
+              if (!gpsOk && !wifiOk) {
                 yield* recordRejection(db, currentUser.id, payload, "out_of_range");
                 return yield* new OutOfRange({});
               }

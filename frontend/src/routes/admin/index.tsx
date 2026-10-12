@@ -1,3 +1,4 @@
+import { errorText } from "@/lib/errors.js";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { getApiClient } from "@/api/client.js";
@@ -83,7 +84,7 @@ function AdminDashboard() {
       setNewUser({ name: "", email: "", role: "student", enrollmentNo: "", password: "" });
       loadUsers();
     } catch (err: any) {
-      setError(err?.message || "Failed to create user");
+      setError(errorText(err) || "Failed to create user");
     } finally {
       setLoading(false);
     }
@@ -101,7 +102,7 @@ function AdminDashboard() {
       loadPendingRebinds();
       loadUsers();
     } catch (err: any) {
-      setError(err?.message || "Failed to approve rebind");
+      setError(errorText(err) || "Failed to approve rebind");
     } finally {
       setLoading(false);
       setApprovingId(null);
@@ -120,7 +121,7 @@ function AdminDashboard() {
       });
       setCourseReport(report);
     } catch (err: any) {
-      setError(err?.message || "Failed to load report");
+      setError(errorText(err) || "Failed to load report");
     } finally {
       setLoading(false);
     }
