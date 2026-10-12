@@ -111,6 +111,11 @@ export const FacultyGroup = HttpApiGroup.make("faculty")
       .addError(BadRequest)
   )
   .add(
+    HttpApiEndpoint.get("listActiveSessions", "/faculty/sessions/active")
+      .addSuccess(Schema.Array(Session))
+      .addError(BadRequest)
+  )
+  .add(
     HttpApiEndpoint.post("createSession", "/faculty/sessions")
       .setPayload(CreateSessionPayload)
       .addSuccess(Session)
@@ -199,6 +204,11 @@ export const AdminGroup = HttpApiGroup.make("admin")
     HttpApiEndpoint.post("approveRebind", "/admin/rebind-device/:requestId/approve")
       .setPath(Schema.Struct({ requestId: Schema.String }))
       .addSuccess(ApproveRebindSuccess)
+      .addError(BadRequest)
+  )
+  .add(
+    HttpApiEndpoint.get("listAllCourses", "/admin/courses")
+      .addSuccess(Schema.Array(Course))
       .addError(BadRequest)
   )
   .add(

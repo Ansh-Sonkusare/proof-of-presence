@@ -114,6 +114,15 @@ export const AdminGroupLive = HttpApiBuilder.group(
           })
         )
       )
+      .handle("listAllCourses", () =>
+        catchDb(
+          Effect.gen(function* () {
+            yield* requireAdmin;
+            const db = yield* Database;
+            return yield* db.course.listAll();
+          })
+        )
+      )
       .handle("getReport", ({ path }) =>
         catchDb(
           Effect.gen(function* () {

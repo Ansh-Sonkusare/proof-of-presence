@@ -62,6 +62,8 @@ export class Database extends Effect.Service<Database>()("Database", {
         findByFacultyId: (facultyId: string) =>
           tryQuery(prisma.course.findMany({ where: { facultyId } })),
 
+        listAll: () => tryQuery(prisma.course.findMany()),
+
         create: (data: { name: string; facultyId: string }) =>
           tryQuery(prisma.course.create({ data })),
       },
@@ -90,6 +92,14 @@ export class Database extends Effect.Service<Database>()("Database", {
             prisma.session.update({
               where: { id },
               data: { endedAt: new Date() },
+            })
+          ),
+
+        listActiveByFacultyId: (facultyId: string) =>
+          tryQuery(
+            prisma.session.findMany({
+              where: { endedAt: null, course: { facultyId } },
+              orderBy: { startedAt: "desc" },
             })
           ),
 

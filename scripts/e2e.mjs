@@ -66,14 +66,14 @@ const prepare = (token, extra) =>
 
 // Proxy attempts
 let r = await prepare(student, { deviceId: "someone-elses-phone" });
-ok(r.status >= 400, `wrong device rejected (${r.json._tag ?? r.status})`);
+ok(r.json._tag === "DeviceMismatch", `wrong device rejected (${r.json._tag ?? r.status})`);
 const bad = qr.json.hmac.slice(0, -1) + (qr.json.hmac.endsWith("0") ? "1" : "0");
 r = await prepare(student, { hmac: bad });
-ok(r.status >= 400, `tampered hmac rejected (${r.json._tag ?? r.status})`);
+ok(r.json._tag === "SignatureInvalid", `tampered hmac rejected (${r.json._tag ?? r.status})`);
 r = await prepare(student, { gpsLat: 19.076, gpsLon: 72.8777 });
-ok(r.status >= 400, `out-of-geofence rejected (${r.json._tag ?? r.status})`);
+ok(r.json._tag === "OutOfRange", `out-of-geofence rejected (${r.json._tag ?? r.status})`);
 r = await prepare(student, { gpsLat: undefined, gpsLon: undefined });
-ok(r.status >= 400, `missing location rejected (${r.json._tag ?? r.status})`);
+ok(r.json._tag === "OutOfRange", `missing location rejected (${r.json._tag ?? r.status})`);
 
 // Happy path: prepare -> sign EIP-712 -> relay
 r = await prepare(student);
@@ -90,7 +90,7 @@ ok(mark.json.txHash, `relayed on-chain, gasless (tx ${mark.json.txHash})`);
 
 // Replay of the same QR nonce
 r = await prepare(student);
-ok(r.status >= 400, `replay rejected (${r.json._tag ?? r.status})`);
+ok(r.json._tag === "QrReplay", `replay rejected (${r.json._tag ?? r.status})`);
 
 // Faculty live feed shows the scan
 const feed = await call("GET", `/faculty/sessions/${sessionId}/live-scans`, faculty);

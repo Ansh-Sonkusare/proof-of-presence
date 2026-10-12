@@ -29,6 +29,13 @@ Logs tail-able at `./logs/hardhat.log`, `./logs/backend.log`, `./logs/frontend.l
 
 ---
 
+## Before You Present
+
+- `./run-dev.sh` re-seeds and **resets student1/student2's wallet and device**, so every run starts from a clean onboarding. Run it shortly before the demo.
+- `npm run e2e` uses its own `e2e@pbl.edu` account and never touches the demo students. Safe to run any time.
+- When the student scans, Chrome asks for location: click **Allow**. If nobody answers within 10s the scan continues without GPS (fine for sessions without a geofence).
+- Rejection reasons show up as plain sentences in the red banner, e.g. "attendance is already marked for this session".
+
 ## Test Accounts
 
 All seeded by `run-dev.sh`. Password for every account: **`password123`**
@@ -56,7 +63,7 @@ Run this end-to-end flow to show all three layers of anti-proxy protection.
 
 ### 2 — Student onboards (first time only)
 
-1. Open a second browser window (or incognito) and log in as `student1@pbl.edu`.
+1. Open an **incognito window** (or a different browser profile) and log in as `student1@pbl.edu`. A normal second tab shares the login with the faculty tab, so logging in there would sign the faculty out.
 2. On the Student Dashboard, click **Generate Wallet** — this creates an ECDSA key pair stored in localStorage.
 3. Click **Enroll This Device** — binds the browser fingerprint to the account.
 
@@ -76,7 +83,7 @@ Back on the Faculty tab, the **Live Scans** table updates with the student's nam
 
 | Scenario | How to trigger | Expected result |
 | --- | --- | --- |
-| Wrong device | Log in as `student1` in a fresh browser profile (different `device_id`) and try to scan | Rejected: `device_mismatch` |
+| Wrong device | Log in as `student1` in another browser or profile (different device id) and scan **before** marking from the enrolled device | "this isn't the device enrolled for your account" |
 | Replayed nonce | Scanning again after being marked once | Rejected: `QrReplay` |
 | Expired QR | Wait 60 s after the last rotation, then scan the old QR | Rejected: `QrExpired` |
 

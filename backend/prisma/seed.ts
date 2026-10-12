@@ -74,6 +74,12 @@ async function main() {
     },
   });
 
+  // Close sessions left open by earlier runs so the faculty page starts clean.
+  await prisma.session.updateMany({
+    where: { endedAt: null },
+    data: { endedAt: new Date() },
+  });
+
   console.log("Seed complete:");
   console.log("  admin@pbl.edu / password123 (role: admin)");
   console.log("  faculty@pbl.edu / password123 (role: faculty)");

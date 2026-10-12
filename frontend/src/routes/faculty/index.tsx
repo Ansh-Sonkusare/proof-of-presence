@@ -89,6 +89,15 @@ function FacultyDashboard() {
         setSelectedCourseId((cur) => cur || cs[0]?.id || "");
       })
       .catch((err: any) => setError(errorText(err) || "Failed to load courses"));
+    getApiClient()
+      .then((c) => c.faculty.listActiveSessions())
+      .then((ss) => {
+        if (ss[0]) {
+          setActiveSession(ss[0]);
+          refreshQr(ss[0].id);
+        }
+      })
+      .catch((err: any) => setError(errorText(err) || "Failed to load active session"));
   }, []);
 
   // Server push via SSE; fall back to polling after repeated EventSource errors.
@@ -154,7 +163,7 @@ function FacultyDashboard() {
               </div>
               <div>
                 <span className="text-gray-600">Course:</span>
-                <p className="mt-1 font-medium">{activeSession.courseId}</p>
+                <p className="mt-1 font-medium">{courses.find((c) => c.id === activeSession.courseId)?.name ?? activeSession.courseId}</p>
               </div>
             </div>
 

@@ -44,6 +44,24 @@ export const FacultyGroupLive = HttpApiBuilder.group(
           })
         )
       )
+      .handle("listActiveSessions", () =>
+        catchDb(
+          Effect.gen(function* () {
+            const currentUser = yield* requireFaculty;
+            const db = yield* Database;
+            const sessions = yield* db.session.listActiveByFacultyId(currentUser.id);
+            return sessions.map((s) => ({
+              id: s.id,
+              courseId: s.courseId,
+              startedAt: s.startedAt.toISOString(),
+              classroomLat: s.classroomLat ?? undefined,
+              classroomLon: s.classroomLon ?? undefined,
+              geofenceRadiusM: s.geofenceRadiusM,
+              classroomWifiBssid: s.classroomWifiBssid ?? undefined,
+            }));
+          })
+        )
+      )
       .handle("createSession", ({ payload }) =>
         catchDb(
           Effect.gen(function* () {
