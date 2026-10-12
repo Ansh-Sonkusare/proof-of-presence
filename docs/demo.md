@@ -83,6 +83,7 @@ Back on the Faculty tab, the **Live Scans** table updates with the student's nam
 
 | Scenario | How to trigger | Expected result |
 | --- | --- | --- |
+| Outside classroom | Faculty: type coordinates of another place (e.g. `19.076`, `72.8777`) under **Classroom location** before **Start Session**. Student scans (deny or allow location) | "you're outside the classroom geofence"; faculty feed shows `out_of_range` |
 | Wrong device | Log in as `student1` in another browser or profile (different device id) and scan **before** marking from the enrolled device | "this isn't the device enrolled for your account" |
 | Replayed nonce | Scanning again after being marked once | Rejected: `QrReplay` |
 | Expired QR | Wait 60 s after the last rotation, then scan the old QR | Rejected: `QrExpired` |

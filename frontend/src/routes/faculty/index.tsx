@@ -19,6 +19,21 @@ function FacultyDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Optional geofence centre; blank = no geofence
+  const [classLat, setClassLat] = useState("");
+  const [classLon, setClassLon] = useState("");
+
+  const useMyLocation = () => {
+    setError("");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setClassLat(p.coords.latitude.toFixed(6));
+        setClassLon(p.coords.longitude.toFixed(6));
+      },
+      () => setError("Couldn't read your location. Allow location access or type the coordinates."),
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   const handleCreateSession = async () => {
     if (!selectedCourseId) return;
@@ -28,7 +43,12 @@ function FacultyDashboard() {
     try {
       const client = await getApiClient();
       const session = await client.faculty.createSession({
-        payload: { courseId: selectedCourseId },
+        payload: {
+          courseId: selectedCourseId,
+          ...(classLat.trim() && classLon.trim()
+            ? { classroomLat: Number(classLat), classroomLon: Number(classLon) }
+            : {}),
+        },
       });
       setActiveSession(session);
       setSuccess("Session started!");
@@ -165,6 +185,14 @@ function FacultyDashboard() {
                 <span className="text-gray-600">Course:</span>
                 <p className="mt-1 font-medium">{courses.find((c) => c.id === activeSession.courseId)?.name ?? activeSession.courseId}</p>
               </div>
+              <div className="col-span-2">
+                <span className="text-gray-600">Geofence:</span>
+                <p className="mt-1 font-medium">
+                  {activeSession.classroomLat != null && activeSession.classroomLon != null
+                    ? `${activeSession.geofenceRadiusM} m around ${activeSession.classroomLat}, ${activeSession.classroomLon}`
+                    : "None (any location accepted)"}
+                </p>
+              </div>
             </div>
 
             {qrPayload && (
@@ -239,6 +267,37 @@ function FacultyDashboard() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Classroom location (optional geofence, 100 m)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={classLat}
+                  onChange={(e) => setClassLat(e.target.value)}
+                  placeholder="Latitude"
+                  inputMode="decimal"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <input
+                  value={classLon}
+                  onChange={(e) => setClassLon(e.target.value)}
+                  placeholder="Longitude"
+                  inputMode="decimal"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={useMyLocation}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Use my location
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Leave blank for no geofence. To demo a rejection from this laptop, enter coordinates of a different place.
+              </p>
             </div>
             <button
               onClick={handleCreateSession}
